@@ -1,7 +1,7 @@
 # IntelliDesk AI — Software Requirement Specification (SRS)
 
 **Document Version:** 1.0  
-**Date:** 2026-07-06  
+**Date:**  
 **Classification:** Internal — Confidential  
 **Prepared By:** IntelliDesk AI Engineering Team  
 **Standard:** IEEE 830-1998 / ISO/IEC/IEEE 29148:2018  

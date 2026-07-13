@@ -1,6 +1,6 @@
 # IntelliDesk AI — Database Design Document
 
-**Document ID:** IDAI-DB-001 | **Version:** 1.0 | **Date:** 2026-07-06
+**Document ID:** IDAI-DB-001 | **Version:** 1.0 | **Date:** 
 
 ---
 
