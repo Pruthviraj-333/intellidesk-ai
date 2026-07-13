@@ -1,0 +1,115 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.whl
+.installed.cfg
+
+# ─── Environment & Secrets ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+secrets.json
+local_settings.py
+
+# ─── Virtual Environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+
+# ─── IDE & Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Testing & Coverage ───────────────────────────────────────────────────────
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+junit.xml
+test-results/
+
+# ─── Alembic / Database Migrations ───────────────────────────────────────────
+# Keep structure and base files; ignore auto-generated version scripts
+# Comment this out if you DO want to track migrations:
+# backend/migrations/versions/*.py
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+backend/logs/
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+.dockerignore
+
+# ─── Node / Frontend ──────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+.npm
+.yarn/
+
+# ─── TypeScript / Build Artifacts ─────────────────────────────────────────────
+*.tsbuildinfo
+frontend/coverage/
+
+# ─── ChromaDB local data ──────────────────────────────────────────────────────
+.chroma/
+chroma_data/
+
+# ─── Uploaded / Static Files (local dev only) ────────────────────────────────
+uploads/
+backend/uploads/
+static/uploads/
+
+# ─── OS Specific ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Temp / Scratch ───────────────────────────────────────────────────────────
+*.tmp
+*.bak
+*.orig
+*.rej
+tmp/
+temp/
+
+# ─── Celery ───────────────────────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid

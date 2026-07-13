@@ -1,0 +1,169 @@
+services:
+  # ─── PostgreSQL Database ────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: intellidesk_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: intellidesk
+      POSTGRES_USER: intellidesk
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-intellidesk_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intellidesk -d intellidesk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: intellidesk_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── ChromaDB (Vector Database) ────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: intellidesk_chromadb
+    restart: unless-stopped
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8001
+    volumes:
+      - chroma_data:/chroma/.chroma/index
+    ports:
+      - "8001:8001"
+
+  # ─── Flask Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: intellidesk_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://intellidesk:${DB_PASSWORD:-intellidesk_password}@postgres:5432/intellidesk
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8001
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Celery Worker ──────────────────────────────────────────────────────────
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: intellidesk_celery_worker
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      -Q email,documents,ai,reports,default
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://intellidesk:${DB_PASSWORD:-intellidesk_password}@postgres:5432/intellidesk
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8001
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Celery Beat (Scheduled Tasks) ─────────────────────────────────────────
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: intellidesk_celery_beat
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app beat
+      --loglevel=info
+      --scheduler redbeat.RedBeatScheduler
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://intellidesk:${DB_PASSWORD:-intellidesk_password}@postgres:5432/intellidesk
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - celery_worker
+
+  # ─── Flower (Celery Dashboard) ──────────────────────────────────────────────
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: intellidesk_flower
+    restart: unless-stopped
+    command: python -m celery -A app.tasks.celery_app flower --port=5555
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+
+  # ─── NGINX Reverse Proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: intellidesk_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  chroma_data:
+
+networks:
+  default:
+    name: intellidesk_network
