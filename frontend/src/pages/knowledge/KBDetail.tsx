@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { ChevronLeft, ThumbsUp, ThumbsDown, Eye, Edit, Calendar, User } from 'lucide-react';
+import { ChevronLeft, ThumbsUp, ThumbsDown, Eye, Edit, Calendar, User, Trash2 } from 'lucide-react';
 
 interface ArticleDetail {
   id: number;
@@ -27,6 +27,7 @@ export const KBDetail: React.FC = () => {
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userVote, setUserVote] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchArticle();
@@ -56,6 +57,24 @@ export const KBDetail: React.FC = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!article) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${article.title}"?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await api.delete(`/knowledge/articles/${article.id}`);
+      navigate('/knowledge');
+    } catch (e: any) {
+      const msg = e.response?.data?.error?.message || 'Failed to delete article.';
+      alert(msg);
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return <div style={{ textAlign: 'center', padding: '3rem' }}>Loading article...</div>;
   }
@@ -65,6 +84,7 @@ export const KBDetail: React.FC = () => {
   }
 
   const isAuthorOrAdmin = user && (user.id === article.author?.id || ['admin', 'super_admin'].includes(user.role));
+  const canDelete = user && ['admin', 'super_admin'].includes(user.role);
 
   return (
     <div className="page-container">
@@ -98,6 +118,17 @@ export const KBDetail: React.FC = () => {
               <Edit size={16} />
               <span>Edit Article</span>
             </Link>
+          )}
+          {canDelete && (
+            <button
+              className="btn btn-danger"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Trash2 size={16} />
+              <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            </button>
           )}
         </div>
 

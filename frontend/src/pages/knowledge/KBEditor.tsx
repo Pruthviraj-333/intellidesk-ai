@@ -23,6 +23,7 @@ export const KBEditor: React.FC = () => {
   const [shortSummary, setShortSummary] = useState('');
   const [body, setBody] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [articleStatus, setArticleStatus] = useState<string>('draft');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -48,10 +49,11 @@ export const KBEditor: React.FC = () => {
       const art = response.data.data;
       setArticleId(art.id);
       setTitle(art.title);
-      setCategoryId(String(art.category?.id || ''));
-      setShortSummary(art.short_summary || '');
+      setCategoryId(String(art.categories?.[0]?.id || ''));
+      setShortSummary(art.summary || '');
       setBody(art.body || '');
-      setTagsInput((art.tags || []).join(', '));
+      setTagsInput((art.tags || []).map((t: any) => t.name).join(', '));
+      setArticleStatus(art.status || 'draft');
     } catch (e) {
       console.error(e);
       navigate('/knowledge');
@@ -84,8 +86,8 @@ export const KBEditor: React.FC = () => {
         savedArticleId = response.data.data.id;
       }
 
-      if (publish && savedArticleId) {
-        // Trigger publish endpoint
+      if (publish && savedArticleId && articleStatus !== 'published') {
+        // Trigger publish endpoint (only if not already published)
         await api.put(`/knowledge/articles/${savedArticleId}/publish`);
       }
 
