@@ -1,21 +1,31 @@
 """IntelliDesk AI — Repositories package."""
 
-from .user_repository import UserRepository, RoleRepository, UserTokenRepository
-from .department_repository import DepartmentRepository, AuditLogRepository, SettingRepository
-from .ticket_repository import TicketRepository, CommentRepository, AttachmentRepository
-from .incident_repository import IncidentRepository, ProblemRepository, NotificationRepository
+from .department_repository import AuditLogRepository, DepartmentRepository, SettingRepository
+from .document_repository import DocumentRepository
+from .incident_repository import IncidentRepository, NotificationRepository, ProblemRepository
 from .knowledge_repository import (
-    ArticleRepository, ArticleCategoryRepository,
+    ArticleCategoryRepository,
+    ArticleRepository,
     ArticleTagRepository,
 )
-from .document_repository import DocumentRepository
+from .ticket_repository import AttachmentRepository, CommentRepository, TicketRepository
+from .user_repository import RoleRepository, UserRepository, UserTokenRepository
 
 __all__ = [
-    "UserRepository", "RoleRepository", "UserTokenRepository",
-    "DepartmentRepository", "AuditLogRepository", "SettingRepository",
-    "TicketRepository", "CommentRepository", "AttachmentRepository",
-    "IncidentRepository", "ProblemRepository", "NotificationRepository",
-    "ArticleRepository", "ArticleCategoryRepository",
+    "UserRepository",
+    "RoleRepository",
+    "UserTokenRepository",
+    "DepartmentRepository",
+    "AuditLogRepository",
+    "SettingRepository",
+    "TicketRepository",
+    "CommentRepository",
+    "AttachmentRepository",
+    "IncidentRepository",
+    "ProblemRepository",
+    "NotificationRepository",
+    "ArticleRepository",
+    "ArticleCategoryRepository",
     "ArticleTagRepository",
     "DocumentRepository",
 ]

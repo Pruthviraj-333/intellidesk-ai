@@ -39,6 +39,7 @@ def generate_article_slug(title: str) -> str:
     Appends a short random suffix to prevent collisions.
     """
     from slugify import slugify
+
     base_slug = slugify(title, max_length=180)
     suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
     return f"{base_slug}-{suffix}"
@@ -48,9 +49,9 @@ def format_bytes(size_in_bytes: int) -> str:
     """Convert bytes to human-readable string (e.g., '2.4 MB')."""
     if size_in_bytes < 1024:
         return f"{size_in_bytes} B"
-    elif size_in_bytes < 1024 ** 2:
+    elif size_in_bytes < 1024**2:
         return f"{size_in_bytes / 1024:.1f} KB"
-    elif size_in_bytes < 1024 ** 3:
+    elif size_in_bytes < 1024**3:
         return f"{size_in_bytes / 1024 ** 2:.1f} MB"
     return f"{size_in_bytes / 1024 ** 3:.1f} GB"
 

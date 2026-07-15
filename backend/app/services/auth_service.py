@@ -12,16 +12,16 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jt
 
 from app.extensions import db
 from app.models.user import User
-from app.repositories.user_repository import UserRepository, RoleRepository, UserTokenRepository
-from app.services.email_service import EmailService
+from app.repositories.user_repository import RoleRepository, UserRepository, UserTokenRepository
 from app.services.audit_service import AuditService
-from app.utils.constants import UserStatus, UserRole, TokenType, AuditAction
+from app.services.email_service import EmailService
+from app.utils.constants import AuditAction, TokenType, UserRole, UserStatus
 from app.utils.exceptions import (
-    ValidationError,
     AuthenticationError,
+    BusinessLogicError,
     ConflictError,
     NotFoundError,
-    BusinessLogicError,
+    ValidationError,
 )
 from app.utils.logger import get_logger
 
@@ -173,9 +173,7 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "Bearer",
-            "expires_in": int(
-                current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()
-            ),
+            "expires_in": int(current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()),
             "user": user,
         }
 
@@ -201,9 +199,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
-            "expires_in": int(
-                current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()
-            ),
+            "expires_in": int(current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds()),
         }
 
     @staticmethod
@@ -215,9 +211,7 @@ class AuthService:
             access_jti: JTI claim from the current access token.
             refresh_token: Raw refresh token to also blacklist.
         """
-        redis_client = redis.from_url(
-            current_app.config["REDIS_URL"], decode_responses=True
-        )
+        redis_client = redis.from_url(current_app.config["REDIS_URL"], decode_responses=True)
         access_ttl = int(current_app.config["JWT_ACCESS_TOKEN_EXPIRES"].total_seconds())
         redis_client.setex(f"blocklist:{access_jti}", access_ttl, "revoked")
 
@@ -225,11 +219,10 @@ class AuthService:
         if refresh_token:
             try:
                 from flask_jwt_extended import decode_token
+
                 decoded = decode_token(refresh_token)
                 refresh_jti = decoded["jti"]
-                refresh_ttl = int(
-                    current_app.config["JWT_REFRESH_TOKEN_EXPIRES"].total_seconds()
-                )
+                refresh_ttl = int(current_app.config["JWT_REFRESH_TOKEN_EXPIRES"].total_seconds())
                 redis_client.setex(f"blocklist:{refresh_jti}", refresh_ttl, "revoked")
             except Exception:
                 pass  # Invalid refresh token — ignore
@@ -251,9 +244,7 @@ class AuthService:
         """
         user_token = UserTokenRepository.verify_token(token, TokenType.EMAIL_VERIFY.value)
         if not user_token:
-            raise ValidationError(
-                "Invalid or expired verification link. Please request a new one."
-            )
+            raise ValidationError("Invalid or expired verification link. Please request a new one.")
 
         user = UserRepository.get_by_id(user_token.user_id)
         if not user:

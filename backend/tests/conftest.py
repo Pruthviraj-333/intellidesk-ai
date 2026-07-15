@@ -7,8 +7,8 @@ import pytest
 
 from app import create_app
 from app.extensions import db as _db
-from app.models.user import User, Role
 from app.models.department import Department, Setting
+from app.models.user import Role, User
 from app.utils.constants import UserRole, UserStatus
 
 
@@ -86,6 +86,7 @@ def _seed_test_data():
 
 
 # ─── Auth Header Helpers ───────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def auth_headers_employee(client):

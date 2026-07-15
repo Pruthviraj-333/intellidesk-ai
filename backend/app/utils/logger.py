@@ -3,12 +3,12 @@ IntelliDesk AI — Structured JSON Logger
 Configures application-wide structured logging with correlation IDs.
 """
 
-import logging
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
-from flask import Flask, request, g
+from flask import Flask, g, request
 
 
 class JSONFormatter(logging.Formatter):

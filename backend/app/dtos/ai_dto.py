@@ -5,11 +5,12 @@ Request validation and response serialization for AI assistant endpoints.
 
 from marshmallow import Schema, fields, validate
 
-
 # ─── Chat Schemas ─────────────────────────────────────────────────────────────
+
 
 class ChatMessageSchema(Schema):
     """Single chat message for history responses."""
+
     id = fields.Int(dump_only=True)
     role = fields.Str(dump_only=True)
     content = fields.Str(dump_only=True)
@@ -22,6 +23,7 @@ class ChatMessageSchema(Schema):
 
 class ChatSessionSchema(Schema):
     """AI conversation session summary."""
+
     session_uuid = fields.Str(dump_only=True)
     title = fields.Str(dump_only=True, allow_none=True)
     ticket_id = fields.Int(dump_only=True, allow_none=True)
@@ -34,6 +36,7 @@ class ChatSessionSchema(Schema):
 
 class ChatRequestSchema(Schema):
     """Incoming chat request from user."""
+
     query = fields.Str(required=True, validate=validate.Length(min=3, max=2000))
     session_uuid = fields.Str(load_default=None)
     ticket_id = fields.Int(load_default=None)
@@ -42,6 +45,7 @@ class ChatRequestSchema(Schema):
 
 class ChatResponseSchema(Schema):
     """AI assistant response envelope."""
+
     session_uuid = fields.Str(dump_only=True)
     session_title = fields.Str(dump_only=True)
     response = fields.Str(dump_only=True)
@@ -58,19 +62,23 @@ class SessionListQuerySchema(Schema):
 
 # ─── Ticket Suggestion Schemas ────────────────────────────────────────────────
 
+
 class TicketSuggestionRequestSchema(Schema):
     """Request for AI-powered agent response suggestion."""
+
     ticket_id = fields.Int(required=True)
     include_rag = fields.Bool(load_default=True)
 
 
 class SummarizeThreadRequestSchema(Schema):
     """Request to summarize a ticket's comment thread."""
+
     ticket_id = fields.Int(required=True)
 
 
 class ClassificationResponseSchema(Schema):
     """AI classification result."""
+
     ticket_id = fields.Int(dump_only=True)
     predicted_category = fields.Str(dump_only=True, allow_none=True)
     predicted_priority = fields.Str(dump_only=True, allow_none=True)
@@ -83,12 +91,15 @@ class ClassificationResponseSchema(Schema):
 
 class FeedbackClassificationSchema(Schema):
     """Human feedback on AI classification accuracy."""
+
     was_accepted = fields.Bool(required=True)
 
 
 # ─── Resolution Guide Schema ──────────────────────────────────────────────────
 
+
 class ResolutionGuideRequestSchema(Schema):
     """Request for step-by-step AI resolution guide."""
+
     issue_description = fields.Str(required=True, validate=validate.Length(min=10, max=2000))
     include_rag = fields.Bool(load_default=True)

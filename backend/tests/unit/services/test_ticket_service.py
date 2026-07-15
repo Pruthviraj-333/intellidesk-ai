@@ -3,11 +3,17 @@ IntelliDesk AI — Ticket Service Unit Tests
 Tests for TicketService business logic with mocked dependencies.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from app.utils.exceptions import AuthorizationError, BusinessLogicError, ValidationError, NotFoundError
+import pytest
+
 from app.utils.constants import TicketStatus, UserRole
+from app.utils.exceptions import (
+    AuthorizationError,
+    BusinessLogicError,
+    NotFoundError,
+    ValidationError,
+)
 
 
 class TestTicketServiceRBAC:
@@ -25,8 +31,11 @@ class TestTicketServiceRBAC:
     def test_employee_cannot_update_ticket(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = self._make_ticket()
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 with pytest.raises(AuthorizationError) as exc_info:
                     TicketService.update_ticket(
                         ticket_id=1,
@@ -40,8 +49,11 @@ class TestTicketServiceRBAC:
     def test_agent_cannot_update_unassigned_ticket(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = self._make_ticket(assignee_id=99)  # different agent
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 with pytest.raises(AuthorizationError) as exc_info:
                     TicketService.update_ticket(
                         ticket_id=1,
@@ -55,8 +67,11 @@ class TestTicketServiceRBAC:
     def test_manager_cannot_update_other_department_ticket(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = self._make_ticket(department_id=10)
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 with pytest.raises(AuthorizationError) as exc_info:
                     TicketService.update_ticket(
                         ticket_id=1,
@@ -73,6 +88,7 @@ class TestTicketStatusTransitions:
 
     def _make_admin_update(self, app, current_status, new_status, extra_data=None):
         from app.services.ticket_service import TicketService
+
         mock_ticket = MagicMock()
         mock_ticket.status = current_status
         mock_ticket.assignee_id = 1
@@ -83,10 +99,14 @@ class TestTicketStatusTransitions:
         if extra_data:
             data.update(extra_data)
 
-        with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket), \
-             patch("app.services.ticket_service.TicketRepository.update", return_value=mock_ticket), \
-             patch("app.services.ticket_service.NotificationRepository.create"), \
-             patch("app.services.ticket_service.AuditService.log"):
+        with (
+            patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ),
+            patch("app.services.ticket_service.TicketRepository.update", return_value=mock_ticket),
+            patch("app.services.ticket_service.NotificationRepository.create"),
+            patch("app.services.ticket_service.AuditService.log"),
+        ):
             return TicketService.update_ticket(
                 ticket_id=1,
                 current_user_id=1,
@@ -103,6 +123,7 @@ class TestTicketStatusTransitions:
     def test_invalid_transition_new_to_closed_raises(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             with pytest.raises(BusinessLogicError) as exc_info:
                 self._make_admin_update(app, TicketStatus.NEW.value, TicketStatus.CLOSED.value)
             assert "Cannot transition" in str(exc_info.value)
@@ -110,15 +131,19 @@ class TestTicketStatusTransitions:
     def test_resolve_without_notes_raises(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = MagicMock()
             mock_ticket.status = TicketStatus.IN_PROGRESS.value
             mock_ticket.assignee_id = 1
             mock_ticket.department_id = 1
             mock_ticket.resolution_notes = None  # No notes
 
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 with pytest.raises(ValidationError) as exc_info:
                     from app.services.ticket_service import TicketService
+
                     TicketService.update_ticket(
                         ticket_id=1,
                         current_user_id=1,
@@ -135,9 +160,12 @@ class TestTicketServiceGetTicket:
     def test_employee_cannot_see_other_user_ticket(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = MagicMock()
             mock_ticket.requester_id = 99  # Different user
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 with pytest.raises(NotFoundError):
                     TicketService.get_ticket(
                         ticket_id=1,
@@ -148,9 +176,12 @@ class TestTicketServiceGetTicket:
     def test_agent_can_see_any_ticket(self, app):
         with app.app_context():
             from app.services.ticket_service import TicketService
+
             mock_ticket = MagicMock()
             mock_ticket.requester_id = 99
-            with patch("app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket):
+            with patch(
+                "app.services.ticket_service.TicketRepository.get_by_id", return_value=mock_ticket
+            ):
                 result = TicketService.get_ticket(
                     ticket_id=1,
                     current_user_id=5,

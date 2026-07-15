@@ -102,9 +102,7 @@ class EmailService:
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:5173")
         verify_url = f"{frontend_url}/verify-email?token={token}"
 
-        html = render_template_string(
-            VERIFY_EMAIL_TEMPLATE, name=user_name, verify_url=verify_url
-        )
+        html = render_template_string(VERIFY_EMAIL_TEMPLATE, name=user_name, verify_url=verify_url)
         return EmailService._send(
             to=user_email,
             subject="Verify your IntelliDesk AI account",
@@ -117,9 +115,7 @@ class EmailService:
         frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:5173")
         reset_url = f"{frontend_url}/reset-password?token={token}"
 
-        html = render_template_string(
-            PASSWORD_RESET_TEMPLATE, name=user_name, reset_url=reset_url
-        )
+        html = render_template_string(PASSWORD_RESET_TEMPLATE, name=user_name, reset_url=reset_url)
         return EmailService._send(
             to=user_email,
             subject="Reset your IntelliDesk AI password",

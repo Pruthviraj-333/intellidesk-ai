@@ -11,6 +11,7 @@ def send_verification_email_task(self, user_email: str, user_name: str, token: s
     """Send email verification link asynchronously."""
     try:
         from app.services.email_service import EmailService
+
         EmailService.send_verification_email(user_email, user_name, token)
     except Exception as exc:
         raise self.retry(exc=exc)
@@ -21,6 +22,7 @@ def send_password_reset_email_task(self, user_email: str, user_name: str, token:
     """Send password reset link asynchronously."""
     try:
         from app.services.email_service import EmailService
+
         EmailService.send_password_reset_email(user_email, user_name, token)
     except Exception as exc:
         raise self.retry(exc=exc)
@@ -31,6 +33,7 @@ def send_ticket_notification_email_task(self, recipient_email: str, subject: str
     """Send a generic ticket notification email."""
     try:
         from app.services.email_service import EmailService
+
         EmailService._send(to=recipient_email, subject=subject, html_body=html_body)
     except Exception as exc:
         raise self.retry(exc=exc)

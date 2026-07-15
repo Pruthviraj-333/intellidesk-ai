@@ -7,23 +7,35 @@ Route prefix: /api/v1/tickets
 from flask import Blueprint
 from flask_jwt_extended import jwt_required
 
-from app.services.ticket_service import TicketService
-from app.repositories.ticket_repository import TicketRepository, CommentRepository
 from app.dtos.ticket_dto import (
-    CreateTicketSchema, UpdateTicketSchema, AssignTicketSchema,
-    BulkUpdateTicketSchema, TicketListQuerySchema, CreateCommentSchema,
-    TicketDetailSchema, TicketSummarySchema, CommentResponseSchema,
+    AssignTicketSchema,
+    BulkUpdateTicketSchema,
+    CommentResponseSchema,
+    CreateCommentSchema,
+    CreateTicketSchema,
+    TicketDetailSchema,
+    TicketListQuerySchema,
+    TicketSummarySchema,
+    UpdateTicketSchema,
 )
-from app.utils.decorators import (
-    validate_body, validate_query, role_required,
-    get_current_user_id, get_current_user_role,
-)
-from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
-)
+from app.repositories.ticket_repository import CommentRepository, TicketRepository
+from app.services.ticket_service import TicketService
 from app.utils.constants import UserRole
+from app.utils.decorators import (
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_body,
+    validate_query,
+)
 from app.utils.exceptions import NotFoundError
+from app.utils.response import (
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 ticket_bp = Blueprint("tickets", __name__, url_prefix="/api/v1/tickets")
 
@@ -81,6 +93,7 @@ def get_ticket(ticket_id: int):
 def update_ticket(data: dict, ticket_id: int):
     """PUT /api/v1/tickets/:id — Update ticket (role-scoped)."""
     from app.repositories.user_repository import UserRepository
+
     user_id = get_current_user_id()
     role = get_current_user_role()
     user = UserRepository.get_by_id(user_id)
@@ -113,6 +126,7 @@ def assign_ticket(data: dict, ticket_id: int):
     user_id = get_current_user_id()
     role = get_current_user_role()
     from app.repositories.user_repository import UserRepository
+
     user = UserRepository.get_by_id(user_id)
     ticket = TicketService.update_ticket(
         ticket_id=ticket_id,
@@ -134,6 +148,7 @@ def bulk_update_tickets(data: dict):
 
 
 # ─── Comment Endpoints ────────────────────────────────────────────────────────
+
 
 @ticket_bp.route("/<int:ticket_id>/comments", methods=["POST"])
 @jwt_required()

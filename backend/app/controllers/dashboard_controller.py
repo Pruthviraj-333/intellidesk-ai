@@ -6,13 +6,18 @@ Route prefix: /api/v1/dashboard
 
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
-
-from app.repositories.ticket_repository import TicketRepository
-from app.repositories.incident_repository import IncidentRepository, NotificationRepository
-from app.utils.decorators import role_required, get_current_user_id, get_current_user_role, validate_query
-from app.utils.response import success_response
-from app.utils.constants import UserRole, TicketStatus, IncidentStatus
 from marshmallow import Schema, fields
+
+from app.repositories.incident_repository import IncidentRepository, NotificationRepository
+from app.repositories.ticket_repository import TicketRepository
+from app.utils.constants import IncidentStatus, TicketStatus, UserRole
+from app.utils.decorators import (
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_query,
+)
+from app.utils.response import success_response
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/api/v1/dashboard")
 
@@ -39,6 +44,7 @@ def get_summary(params: dict):
     role = get_current_user_role()
 
     from app.repositories.user_repository import UserRepository
+
     user = UserRepository.get_by_id(user_id)
     dept_id = params.get("department_id")
 
@@ -47,6 +53,7 @@ def get_summary(params: dict):
         # Employee sees only their own tickets
         from app.extensions import db
         from app.models.ticket import Ticket
+
         own_tickets = Ticket.query.filter_by(requester_id=user_id, deleted_at=None)
         ticket_stats = {
             "open": own_tickets.filter(
@@ -57,15 +64,18 @@ def get_summary(params: dict):
             "total": own_tickets.count(),
         }
         unread = NotificationRepository.get_unread_count(user_id)
-        return success_response({
-            "ticket_stats": ticket_stats,
-            "unread_notifications": unread,
-        })
+        return success_response(
+            {
+                "ticket_stats": ticket_stats,
+                "unread_notifications": unread,
+            }
+        )
 
     # For agents: show their assigned tickets
     if role == UserRole.AGENT.value:
         from app.extensions import db
         from app.models.ticket import Ticket
+
         assigned = Ticket.query.filter_by(assignee_id=user_id, deleted_at=None)
         ticket_stats = {
             "assigned_to_me": assigned.filter(
@@ -78,10 +88,12 @@ def get_summary(params: dict):
             ).count(),
         }
         unread = NotificationRepository.get_unread_count(user_id)
-        return success_response({
-            "ticket_stats": ticket_stats,
-            "unread_notifications": unread,
-        })
+        return success_response(
+            {
+                "ticket_stats": ticket_stats,
+                "unread_notifications": unread,
+            }
+        )
 
     # For managers/admins: full platform or department-scoped stats
     scope_dept_id = None
@@ -94,6 +106,7 @@ def get_summary(params: dict):
 
     # Incident stats
     from app.models.incident import Incident
+
     incident_query = Incident.query.filter_by(deleted_at=None)
     if scope_dept_id:
         incident_query = incident_query.filter_by(department_id=scope_dept_id)
@@ -107,11 +120,13 @@ def get_summary(params: dict):
     }
 
     unread = NotificationRepository.get_unread_count(user_id)
-    return success_response({
-        "ticket_stats": ticket_stats,
-        "incident_stats": incident_stats,
-        "unread_notifications": unread,
-    })
+    return success_response(
+        {
+            "ticket_stats": ticket_stats,
+            "incident_stats": incident_stats,
+            "unread_notifications": unread,
+        }
+    )
 
 
 @dashboard_bp.route("/ticket-trends", methods=["GET"])
@@ -122,8 +137,10 @@ def get_ticket_trends():
     Live daily ticket creation and resolution counts for the last N days.
     No snapshot dependency — queries tickets table directly.
     """
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     from sqlalchemy import func
+
     from app.extensions import db
     from app.models.ticket import Ticket
 
@@ -167,11 +184,13 @@ def get_ticket_trends():
         merged[d]["tickets_resolved"] = row.count
 
     trend_list = sorted(merged.values(), key=lambda x: x["date"])
-    return success_response({
-        "period_days": days,
-        "data_points": len(trend_list),
-        "trends": trend_list,
-    })
+    return success_response(
+        {
+            "period_days": days,
+            "data_points": len(trend_list),
+            "trends": trend_list,
+        }
+    )
 
 
 @dashboard_bp.route("/live-agent-leaderboard", methods=["GET"])
@@ -181,8 +200,10 @@ def get_live_agent_leaderboard():
     GET /api/v1/dashboard/live-agent-leaderboard?days=30&limit=8
     Live agent performance stats — queries tickets directly, no snapshots needed.
     """
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
     from sqlalchemy import func
+
     from app.extensions import db
     from app.models.ticket import Ticket
     from app.models.user import User
@@ -197,9 +218,9 @@ def get_live_agent_leaderboard():
         db.session.query(
             Ticket.assignee_id,
             func.count(Ticket.id).label("total_assigned"),
-            func.sum(
-                db.case((Ticket.status == TicketStatus.RESOLVED.value, 1), else_=0)
-            ).label("resolved"),
+            func.sum(db.case((Ticket.status == TicketStatus.RESOLVED.value, 1), else_=0)).label(
+                "resolved"
+            ),
             func.sum(
                 db.case((Ticket.sla_resolution_breached == True, 1), else_=0)  # noqa: E712
             ).label("breached"),
@@ -224,14 +245,16 @@ def get_live_agent_leaderboard():
             continue
         assigned = row.total_assigned or 0
         resolved = int(row.resolved or 0)
-        result.append({
-            "agent_id": row.assignee_id,
-            "agent_name": f"{agent.first_name} {agent.last_name}",
-            "tickets_resolved": resolved,
-            "tickets_assigned": assigned,
-            "sla_breached": int(row.breached or 0),
-            "resolution_rate": round(resolved / assigned * 100, 1) if assigned > 0 else 0.0,
-        })
+        result.append(
+            {
+                "agent_id": row.assignee_id,
+                "agent_name": f"{agent.first_name} {agent.last_name}",
+                "tickets_resolved": resolved,
+                "tickets_assigned": assigned,
+                "sla_breached": int(row.breached or 0),
+                "resolution_rate": round(resolved / assigned * 100, 1) if assigned > 0 else 0.0,
+            }
+        )
 
     return success_response({"period_days": days, "agents": result})
 
@@ -243,9 +266,10 @@ def get_sla_compliance():
     GET /api/v1/dashboard/sla-compliance
     SLA compliance rates broken down by ticket priority.
     """
+    from sqlalchemy import func
+
     from app.extensions import db
     from app.models.ticket import Ticket
-    from sqlalchemy import func
     from app.utils.constants import TicketPriority
 
     result = {}
@@ -273,10 +297,11 @@ def get_agent_performance():
     GET /api/v1/dashboard/agent-performance
     Resolution stats per agent for performance tracking.
     """
+    from sqlalchemy import func
+
     from app.extensions import db
     from app.models.ticket import Ticket
     from app.models.user import User
-    from sqlalchemy import func
 
     stats = (
         db.session.query(
@@ -284,9 +309,9 @@ def get_agent_performance():
             User.first_name,
             User.last_name,
             func.count(Ticket.id).label("total_assigned"),
-            func.sum(
-                db.case((Ticket.status == TicketStatus.RESOLVED.value, 1), else_=0)
-            ).label("resolved"),
+            func.sum(db.case((Ticket.status == TicketStatus.RESOLVED.value, 1), else_=0)).label(
+                "resolved"
+            ),
             func.sum(
                 db.case((Ticket.sla_resolution_breached == True, 1), else_=0)  # noqa: E712
             ).label("breached"),
@@ -297,17 +322,20 @@ def get_agent_performance():
         .all()
     )
 
-    return success_response([
-        {
-            "agent_id": row.id,
-            "agent_name": f"{row.first_name} {row.last_name}",
-            "total_assigned": row.total_assigned,
-            "resolved": row.resolved or 0,
-            "sla_breached": row.breached or 0,
-            "resolution_rate": (
-                round((row.resolved / row.total_assigned * 100), 1)
-                if row.total_assigned > 0 else 0.0
-            ),
-        }
-        for row in stats
-    ])
+    return success_response(
+        [
+            {
+                "agent_id": row.id,
+                "agent_name": f"{row.first_name} {row.last_name}",
+                "total_assigned": row.total_assigned,
+                "resolved": row.resolved or 0,
+                "sla_breached": row.breached or 0,
+                "resolution_rate": (
+                    round((row.resolved / row.total_assigned * 100), 1)
+                    if row.total_assigned > 0
+                    else 0.0
+                ),
+            }
+            for row in stats
+        ]
+    )

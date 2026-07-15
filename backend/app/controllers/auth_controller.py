@@ -6,28 +6,28 @@ Route prefix: /api/v1/auth
 
 from flask import Blueprint
 from flask_jwt_extended import (
-    jwt_required,
-    get_jwt_identity,
     get_jwt,
+    get_jwt_identity,
+    jwt_required,
 )
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from app.services.auth_service import AuthService
 from app.dtos.auth_dto import (
-    RegisterSchema,
-    LoginSchema,
-    RefreshSchema,
-    LogoutSchema,
     ForgotPasswordSchema,
-    ResetPasswordSchema,
-    VerifyEmailSchema,
+    LoginSchema,
+    LogoutSchema,
+    RefreshSchema,
+    RegisterSchema,
     ResendVerificationSchema,
+    ResetPasswordSchema,
     UserResponseSchema,
+    VerifyEmailSchema,
 )
-from app.utils.decorators import validate_body
-from app.utils.response import success_response, created_response
 from app.extensions import limiter
+from app.services.auth_service import AuthService
+from app.utils.decorators import validate_body
+from app.utils.response import created_response, success_response
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
 
@@ -91,8 +91,9 @@ def refresh():
 
     # Blacklist the current refresh token
     jti = claims.get("jti")
-    from flask import current_app
     import redis
+    from flask import current_app
+
     redis_client = redis.from_url(current_app.config["REDIS_URL"], decode_responses=True)
     refresh_ttl = int(current_app.config["JWT_REFRESH_TOKEN_EXPIRES"].total_seconds())
     redis_client.setex(f"blocklist:{jti}", refresh_ttl, "revoked")

@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import or_
 
 from app.extensions import db
-from app.models.knowledge import KnowledgeArticle, ArticleCategory, ArticleTag, ArticleVote
+from app.models.knowledge import ArticleCategory, ArticleTag, ArticleVote, KnowledgeArticle
 from app.utils.constants import ArticleStatus
 from app.utils.helpers import generate_article_slug
 
@@ -107,9 +107,7 @@ class ArticleRepository:
                 ArticleCategory.id == category_id
             )
         if tag:
-            query = query.join(KnowledgeArticle.tags).filter(
-                ArticleTag.slug == tag
-            )
+            query = query.join(KnowledgeArticle.tags).filter(ArticleTag.slug == tag)
         if search:
             term = f"%{search}%"
             query = query.filter(
@@ -142,9 +140,7 @@ class ArticleRepository:
         Handles the unique constraint — updates vote if already exists.
         Returns vote counts.
         """
-        existing = ArticleVote.query.filter_by(
-            article_id=article_id, user_id=user_id
-        ).first()
+        existing = ArticleVote.query.filter_by(article_id=article_id, user_id=user_id).first()
 
         article = KnowledgeArticle.query.get(article_id)
         if not article:
@@ -185,9 +181,11 @@ class ArticleCategoryRepository:
 
     @staticmethod
     def get_all_active() -> list[ArticleCategory]:
-        return ArticleCategory.query.filter_by(
-            is_active=True, parent_id=None
-        ).order_by(ArticleCategory.sort_order).all()
+        return (
+            ArticleCategory.query.filter_by(is_active=True, parent_id=None)
+            .order_by(ArticleCategory.sort_order)
+            .all()
+        )
 
     @staticmethod
     def create(
@@ -199,8 +197,12 @@ class ArticleCategoryRepository:
         sort_order: int = 0,
     ) -> ArticleCategory:
         cat = ArticleCategory(
-            name=name, slug=slug, description=description,
-            icon=icon, parent_id=parent_id, sort_order=sort_order,
+            name=name,
+            slug=slug,
+            description=description,
+            icon=icon,
+            parent_id=parent_id,
+            sort_order=sort_order,
         )
         db.session.add(cat)
         db.session.commit()
@@ -214,6 +216,7 @@ class ArticleTagRepository:
     def get_or_create_tags(tag_names: list[str]) -> list[ArticleTag]:
         """Get existing tags or create new ones. Returns list of tag objects."""
         from slugify import slugify
+
         tags = []
         for name in tag_names:
             name = name.strip().lower()

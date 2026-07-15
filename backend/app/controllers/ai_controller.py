@@ -5,37 +5,50 @@ Route prefix: /api/v1/ai
 """
 
 from datetime import datetime, timezone
+
 from flask import Blueprint
 from flask_jwt_extended import jwt_required
 
+from app.dtos.ai_dto import (
+    ChatMessageSchema,
+    ChatRequestSchema,
+    ChatResponseSchema,
+    ChatSessionSchema,
+    ClassificationResponseSchema,
+    FeedbackClassificationSchema,
+    ResolutionGuideRequestSchema,
+    SessionListQuerySchema,
+    SummarizeThreadRequestSchema,
+    TicketSuggestionRequestSchema,
+)
+from app.models.ai import AIClassification
+from app.repositories.knowledge_repository import ArticleRepository
+from app.repositories.ticket_repository import TicketRepository
 from app.services.ai_service import AIChatService, AITicketClassifier
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
-from app.repositories.ticket_repository import TicketRepository
-from app.repositories.knowledge_repository import ArticleRepository
-from app.models.ai import AIClassification
-from app.dtos.ai_dto import (
-    ChatRequestSchema, ChatResponseSchema, ChatSessionSchema,
-    ChatMessageSchema, SessionListQuerySchema,
-    TicketSuggestionRequestSchema, SummarizeThreadRequestSchema,
-    ClassificationResponseSchema, FeedbackClassificationSchema,
-    ResolutionGuideRequestSchema,
-)
-from app.utils.decorators import (
-    validate_body, validate_query, role_required,
-    get_current_user_id, get_current_user_role,
-)
-from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
-)
 from app.utils.constants import UserRole
-from app.utils.exceptions import NotFoundError, BusinessLogicError
+from app.utils.decorators import (
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_body,
+    validate_query,
+)
+from app.utils.exceptions import BusinessLogicError, NotFoundError
+from app.utils.response import (
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/api/v1/ai")
 
 
 # ─── Chat Endpoints ───────────────────────────────────────────────────────────
+
 
 @ai_bp.route("/chat", methods=["POST"])
 @jwt_required()
@@ -94,6 +107,7 @@ def delete_session(session_uuid: str):
 
 # ─── Ticket AI Features ───────────────────────────────────────────────────────
 
+
 @ai_bp.route("/tickets/<int:ticket_id>/classify", methods=["POST"])
 @role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 def classify_ticket(ticket_id: int):
@@ -134,11 +148,13 @@ def suggest_ticket_response(ticket_id: int):
         ticket_description=ticket.description,
         context=context,
     )
-    return success_response({
-        "ticket_number": ticket.ticket_number,
-        "suggestion": suggestion,
-        "rag_context_used": bool(context),
-    })
+    return success_response(
+        {
+            "ticket_number": ticket.ticket_number,
+            "suggestion": suggestion,
+            "rag_context_used": bool(context),
+        }
+    )
 
 
 @ai_bp.route("/tickets/<int:ticket_id>/summarize", methods=["POST"])
@@ -153,10 +169,12 @@ def summarize_ticket(ticket_id: int):
         raise NotFoundError("Ticket", ticket_id)
 
     if not ticket.comments:
-        return success_response({
-            "ticket_number": ticket.ticket_number,
-            "summary": "No comments available to summarize.",
-        })
+        return success_response(
+            {
+                "ticket_number": ticket.ticket_number,
+                "summary": "No comments available to summarize.",
+            }
+        )
 
     comments_data = [
         {
@@ -173,11 +191,13 @@ def summarize_ticket(ticket_id: int):
         ticket_title=ticket.title,
         comments=comments_data,
     )
-    return success_response({
-        "ticket_number": ticket.ticket_number,
-        "summary": summary,
-        "comment_count": len(comments_data),
-    })
+    return success_response(
+        {
+            "ticket_number": ticket.ticket_number,
+            "summary": summary,
+            "comment_count": len(comments_data),
+        }
+    )
 
 
 @ai_bp.route("/tickets/<int:ticket_id>/classification", methods=["GET"])
@@ -185,8 +205,7 @@ def summarize_ticket(ticket_id: int):
 def get_ticket_classification(ticket_id: int):
     """GET /api/v1/ai/tickets/:id/classification — Get latest AI classification."""
     classification = (
-        AIClassification.query
-        .filter_by(ticket_id=ticket_id)
+        AIClassification.query.filter_by(ticket_id=ticket_id)
         .order_by(AIClassification.created_at.desc())
         .first()
     )
@@ -206,8 +225,7 @@ def feedback_classification(data: dict, ticket_id: int):
     """
     user_id = get_current_user_id()
     classification = (
-        AIClassification.query
-        .filter_by(ticket_id=ticket_id)
+        AIClassification.query.filter_by(ticket_id=ticket_id)
         .order_by(AIClassification.created_at.desc())
         .first()
     )
@@ -215,18 +233,22 @@ def feedback_classification(data: dict, ticket_id: int):
         raise NotFoundError("AIClassification", ticket_id)
 
     from app.extensions import db
+
     classification.was_accepted = data["was_accepted"]
     classification.feedback_by = user_id
     classification.feedback_at = datetime.now(timezone.utc)
     db.session.commit()
 
-    return success_response({
-        "message": "Feedback recorded. Thank you for improving IntelliDesk AI.",
-        "was_accepted": classification.was_accepted,
-    })
+    return success_response(
+        {
+            "message": "Feedback recorded. Thank you for improving IntelliDesk AI.",
+            "was_accepted": classification.was_accepted,
+        }
+    )
 
 
 # ─── General AI Features ──────────────────────────────────────────────────────
+
 
 @ai_bp.route("/resolution-guide", methods=["POST"])
 @jwt_required()
@@ -247,8 +269,10 @@ def get_resolution_guide(data: dict):
         issue_description=issue,
         context=context,
     )
-    return success_response({
-        "issue_description": issue,
-        "resolution_guide": guide,
-        "rag_context_used": bool(context),
-    })
+    return success_response(
+        {
+            "issue_description": issue,
+            "resolution_guide": guide,
+            "rag_context_used": bool(context),
+        }
+    )

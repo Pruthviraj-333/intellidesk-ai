@@ -3,19 +3,19 @@ IntelliDesk AI — Analytics Service
 Computes and retrieves platform KPI metrics with caching via Redis.
 """
 
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import func, case, cast, Date, extract
+from sqlalchemy import Date, case, cast, extract, func
 
 from app.extensions import db
-from app.models.analytics import DailyMetricSnapshot, AgentDailyMetric
-from app.models.ticket import Ticket, Comment
+from app.models.ai import AISession
+from app.models.analytics import AgentDailyMetric, DailyMetricSnapshot
 from app.models.incident import Incident
 from app.models.knowledge import KnowledgeArticle
-from app.models.ai import AISession
+from app.models.ticket import Comment, Ticket
 from app.models.user import User
-from app.utils.constants import TicketStatus, TicketPriority, IncidentSeverity
+from app.utils.constants import IncidentSeverity, TicketPriority, TicketStatus
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +31,9 @@ class AnalyticsService:
     # ─── Snapshot Aggregation (called by Celery Beat nightly) ─────────────────
 
     @staticmethod
-    def compute_daily_snapshot(target_date: date, department_id: Optional[int] = None) -> DailyMetricSnapshot:
+    def compute_daily_snapshot(
+        target_date: date, department_id: Optional[int] = None
+    ) -> DailyMetricSnapshot:
         """
         Compute and upsert the daily metric snapshot for a given date.
         Idempotent — safe to run multiple times for the same date.
@@ -49,9 +51,7 @@ class AnalyticsService:
 
         tickets_created = created_q.count()
         tickets_resolved = resolved_q.count()
-        tickets_closed = base_q.filter(
-            Ticket.closed_at.between(start, end)
-        ).count()
+        tickets_closed = base_q.filter(Ticket.closed_at.between(start, end)).count()
         tickets_open = base_q.filter(
             Ticket.status.notin_([TicketStatus.RESOLVED.value, TicketStatus.CLOSED.value])
         ).count()
@@ -61,19 +61,24 @@ class AnalyticsService:
         ).count()
 
         # ── SLA metrics ───────────────────────────────────────────────────────
-        sla_breached = resolved_q.filter(Ticket.sla_resolution_breached == True).count()  # noqa: E712
+        sla_breached = resolved_q.filter(
+            Ticket.sla_resolution_breached == True
+        ).count()  # noqa: E712
         sla_met = tickets_resolved - sla_breached
         compliance = round((sla_met / tickets_resolved * 100), 2) if tickets_resolved > 0 else 100.0
 
         # ── Avg resolution time (hours) ───────────────────────────────────────
-        resolved_with_times = resolved_q.filter(
-            Ticket.resolved_at.isnot(None),
-            Ticket.created_at.isnot(None),
-        ).with_entities(Ticket.created_at, Ticket.resolved_at).all()
+        resolved_with_times = (
+            resolved_q.filter(
+                Ticket.resolved_at.isnot(None),
+                Ticket.created_at.isnot(None),
+            )
+            .with_entities(Ticket.created_at, Ticket.resolved_at)
+            .all()
+        )
 
         resolution_times = [
-            (r.resolved_at - r.created_at).total_seconds() / 3600
-            for r in resolved_with_times
+            (r.resolved_at - r.created_at).total_seconds() / 3600 for r in resolved_with_times
         ]
         avg_res_time = (sum(resolution_times) / len(resolution_times)) if resolution_times else None
 
@@ -94,9 +99,12 @@ class AnalyticsService:
             KnowledgeArticle.published_at.between(start, end),
             KnowledgeArticle.deleted_at.is_(None),
         ).count()
-        article_views = KnowledgeArticle.query.filter(
-            KnowledgeArticle.deleted_at.is_(None)
-        ).with_entities(func.sum(KnowledgeArticle.view_count)).scalar() or 0
+        article_views = (
+            KnowledgeArticle.query.filter(KnowledgeArticle.deleted_at.is_(None))
+            .with_entities(func.sum(KnowledgeArticle.view_count))
+            .scalar()
+            or 0
+        )
         ai_sess = AISession.query.filter(AISession.created_at.between(start, end)).count()
         ai_tokens = db.session.query(func.sum(AISession.total_tokens_used)).scalar() or 0
 
@@ -146,6 +154,7 @@ class AnalyticsService:
         end = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=timezone.utc)
 
         from app.utils.constants import UserRole
+
         agents = User.query.filter(
             User.role.has(name=UserRole.AGENT.value),
             User.deleted_at.is_(None),
@@ -166,12 +175,16 @@ class AnalyticsService:
 
             assigned_count = assigned.count()
             resolved_count = resolved.count()
-            breached_count = resolved.filter(Ticket.sla_resolution_breached == True).count()  # noqa: E712
+            breached_count = resolved.filter(
+                Ticket.sla_resolution_breached == True
+            ).count()  # noqa: E712
 
             # Avg resolution time
-            res_tickets = resolved.filter(
-                Ticket.resolved_at.isnot(None), Ticket.created_at.isnot(None)
-            ).with_entities(Ticket.created_at, Ticket.resolved_at).all()
+            res_tickets = (
+                resolved.filter(Ticket.resolved_at.isnot(None), Ticket.created_at.isnot(None))
+                .with_entities(Ticket.created_at, Ticket.resolved_at)
+                .all()
+            )
             times = [(r.resolved_at - r.created_at).total_seconds() / 3600 for r in res_tickets]
             avg_res = sum(times) / len(times) if times else None
 
@@ -285,16 +298,20 @@ class AnalyticsService:
                 continue
             assigned = row.assigned or 0
             resolved = row.resolved or 0
-            result.append({
-                "agent_id": row.agent_id,
-                "agent_name": f"{agent.first_name} {agent.last_name}",
-                "avatar_url": agent.avatar_url,
-                "tickets_resolved": int(resolved),
-                "tickets_assigned": int(assigned),
-                "sla_breached": int(row.breached or 0),
-                "resolution_rate": round(resolved / assigned * 100, 1) if assigned > 0 else 0.0,
-                "avg_resolution_hours": round(float(row.avg_res_time), 1) if row.avg_res_time else None,
-            })
+            result.append(
+                {
+                    "agent_id": row.agent_id,
+                    "agent_name": f"{agent.first_name} {agent.last_name}",
+                    "avatar_url": agent.avatar_url,
+                    "tickets_resolved": int(resolved),
+                    "tickets_assigned": int(assigned),
+                    "sla_breached": int(row.breached or 0),
+                    "resolution_rate": round(resolved / assigned * 100, 1) if assigned > 0 else 0.0,
+                    "avg_resolution_hours": (
+                        round(float(row.avg_res_time), 1) if row.avg_res_time else None
+                    ),
+                }
+            )
         return result
 
     @staticmethod
@@ -315,8 +332,7 @@ class AnalyticsService:
             .all()
         )
         return [
-            {"day": int(r.day_of_week), "hour": int(r.hour_of_day), "count": r.count}
-            for r in rows
+            {"day": int(r.day_of_week), "hour": int(r.hour_of_day), "count": r.count} for r in rows
         ]
 
     @staticmethod

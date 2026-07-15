@@ -7,8 +7,8 @@ import uuid
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
-from app.utils.constants import TicketStatus, TicketPriority
+from app.models.base import SoftDeleteMixin, TimestampMixin
+from app.utils.constants import TicketPriority, TicketStatus
 
 
 class Ticket(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -32,7 +32,9 @@ class Ticket(db.Model, TimestampMixin, SoftDeleteMixin):
     # Ownership
     requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     assignee_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
+    department_id = db.Column(
+        db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True
+    )
     project_id = db.Column(db.Integer, db.ForeignKey("projects.id"), nullable=True)
     incident_id = db.Column(db.Integer, db.ForeignKey("incidents.id"), nullable=True)
 
@@ -62,10 +64,14 @@ class Ticket(db.Model, TimestampMixin, SoftDeleteMixin):
     assignee = db.relationship("User", foreign_keys=[assignee_id], backref="assigned_tickets")
     department = db.relationship("Department", foreign_keys=[department_id], backref="tickets")
     comments = db.relationship(
-        "Comment", back_populates="ticket", cascade="all, delete-orphan",
-        order_by="Comment.created_at"
+        "Comment",
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="Comment.created_at",
     )
-    attachments = db.relationship("Attachment", back_populates="ticket", cascade="all, delete-orphan")
+    attachments = db.relationship(
+        "Attachment", back_populates="ticket", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Ticket {self.ticket_number} [{self.status}]>"
@@ -96,8 +102,7 @@ class Comment(db.Model, TimestampMixin, SoftDeleteMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(
-        db.Integer, db.ForeignKey("tickets.id", ondelete="CASCADE"),
-        nullable=False, index=True
+        db.Integer, db.ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
     )
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     body = db.Column(db.Text, nullable=False)

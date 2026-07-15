@@ -4,10 +4,11 @@ Request validation and response serialization for auth and user endpoints.
 """
 
 import re
-from marshmallow import Schema, fields, validate, validates, validates_schema, ValidationError
 
+from marshmallow import Schema, ValidationError, fields, validate, validates, validates_schema
 
 # ─── Password Validator ────────────────────────────────────────────────────────
+
 
 def validate_password(password: str):
     """
@@ -28,8 +29,10 @@ def validate_password(password: str):
 
 # ─── Auth Request Schemas ──────────────────────────────────────────────────────
 
+
 class RegisterSchema(Schema):
     """Validates user registration input."""
+
     email = fields.Email(required=True, validate=validate.Length(max=255))
     password = fields.Str(required=True, load_only=True, validate=validate_password)
     confirm_password = fields.Str(required=True, load_only=True)
@@ -46,27 +49,32 @@ class RegisterSchema(Schema):
 
 class LoginSchema(Schema):
     """Validates login credentials."""
+
     email = fields.Email(required=True)
     password = fields.Str(required=True, load_only=True)
 
 
 class RefreshSchema(Schema):
     """Validates token refresh request."""
+
     refresh_token = fields.Str(required=True)
 
 
 class LogoutSchema(Schema):
     """Validates logout request."""
+
     refresh_token = fields.Str(load_default=None)
 
 
 class ForgotPasswordSchema(Schema):
     """Validates forgot password request."""
+
     email = fields.Email(required=True)
 
 
 class ResetPasswordSchema(Schema):
     """Validates password reset."""
+
     token = fields.Str(required=True)
     password = fields.Str(required=True, load_only=True, validate=validate_password)
     confirm_password = fields.Str(required=True, load_only=True)
@@ -79,16 +87,19 @@ class ResetPasswordSchema(Schema):
 
 class VerifyEmailSchema(Schema):
     """Validates email verification request."""
+
     token = fields.Str(required=True)
 
 
 class ResendVerificationSchema(Schema):
     """Validates resend verification request."""
+
     email = fields.Email(required=True)
 
 
 class ChangePasswordSchema(Schema):
     """Validates password change for authenticated users."""
+
     current_password = fields.Str(required=True, load_only=True)
     new_password = fields.Str(required=True, load_only=True, validate=validate_password)
     confirm_password = fields.Str(required=True, load_only=True)
@@ -101,8 +112,10 @@ class ChangePasswordSchema(Schema):
 
 # ─── User Response Schemas ─────────────────────────────────────────────────────
 
+
 class RoleSchema(Schema):
     """Serializes Role for embedding in User responses."""
+
     id = fields.Int(dump_only=True)
     name = fields.Str(dump_only=True)
     description = fields.Str(dump_only=True)
@@ -110,12 +123,14 @@ class RoleSchema(Schema):
 
 class DepartmentSummarySchema(Schema):
     """Minimal Department representation for embedding."""
+
     id = fields.Int(dump_only=True)
     name = fields.Str(dump_only=True)
 
 
 class UserSummarySchema(Schema):
     """Minimal User representation for embedding in other resources."""
+
     id = fields.Int(dump_only=True)
     uuid = fields.Str(dump_only=True)
     full_name = fields.Method("get_full_name")
@@ -132,6 +147,7 @@ class UserSummarySchema(Schema):
 
 class UserResponseSchema(Schema):
     """Full User serialization for API responses."""
+
     id = fields.Int(dump_only=True)
     uuid = fields.Str(dump_only=True)
     email = fields.Email(dump_only=True)
@@ -159,6 +175,7 @@ class UserResponseSchema(Schema):
 
 class UpdateProfileSchema(Schema):
     """Validates profile update input."""
+
     first_name = fields.Str(validate=validate.Length(min=2, max=100))
     last_name = fields.Str(validate=validate.Length(min=2, max=100))
     phone = fields.Str(allow_none=True, validate=validate.Length(max=20))
@@ -168,6 +185,7 @@ class UpdateProfileSchema(Schema):
 
 class UpdateUserAdminSchema(Schema):
     """Validates admin user update (role, department, status)."""
+
     role_id = fields.Int()
     department_id = fields.Int(allow_none=True)
     status = fields.Str(validate=validate.OneOf(["active", "inactive", "locked"]))
@@ -177,6 +195,7 @@ class UpdateUserAdminSchema(Schema):
 
 class UserListQuerySchema(Schema):
     """Validates query parameters for user list endpoint."""
+
     role = fields.Str()
     department_id = fields.Int()
     status = fields.Str()
@@ -192,8 +211,10 @@ class UserListQuerySchema(Schema):
 
 # ─── Department Schemas ────────────────────────────────────────────────────────
 
+
 class DepartmentResponseSchema(Schema):
     """Full Department serialization."""
+
     id = fields.Int(dump_only=True)
     name = fields.Str(dump_only=True)
     description = fields.Str(dump_only=True, allow_none=True)
@@ -207,6 +228,7 @@ class DepartmentResponseSchema(Schema):
 
 class CreateDepartmentSchema(Schema):
     """Validates department creation."""
+
     name = fields.Str(required=True, validate=validate.Length(min=2, max=100))
     description = fields.Str(load_default=None, validate=validate.Length(max=500))
     manager_id = fields.Int(load_default=None)
@@ -214,6 +236,7 @@ class CreateDepartmentSchema(Schema):
 
 class UpdateDepartmentSchema(Schema):
     """Validates department update."""
+
     name = fields.Str(validate=validate.Length(min=2, max=100))
     description = fields.Str(allow_none=True)
     manager_id = fields.Int(allow_none=True)
@@ -223,8 +246,10 @@ class UpdateDepartmentSchema(Schema):
 
 # ─── AuditLog Schema ──────────────────────────────────────────────────────────
 
+
 class AuditLogResponseSchema(Schema):
     """Serializes AuditLog for admin API responses."""
+
     id = fields.Int(dump_only=True)
     user = fields.Nested(UserSummarySchema, dump_only=True, allow_none=True)
     action = fields.Str(dump_only=True)

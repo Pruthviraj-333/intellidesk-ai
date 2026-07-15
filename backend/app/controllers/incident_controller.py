@@ -5,29 +5,45 @@ HTTP handlers for ITIL incident/problem management and notifications.
 
 from flask import Blueprint
 from flask_jwt_extended import jwt_required
+from marshmallow import Schema, fields
+from marshmallow import validate as ma_validate
 
+from app.dtos.ticket_dto import (
+    AddTimelineEntrySchema,
+    CreateIncidentSchema,
+    CreateProblemSchema,
+    IncidentDetailSchema,
+    IncidentSummarySchema,
+    IncidentTimelineSchema,
+    NotificationListQuerySchema,
+    NotificationSchema,
+    ProblemDetailSchema,
+    ProblemSummarySchema,
+    UpdateIncidentSchema,
+    UpdateProblemSchema,
+)
 from app.repositories.incident_repository import (
-    IncidentRepository, ProblemRepository, NotificationRepository,
+    IncidentRepository,
+    NotificationRepository,
+    ProblemRepository,
 )
 from app.services.audit_service import AuditService
-from app.dtos.ticket_dto import (
-    CreateIncidentSchema, UpdateIncidentSchema, AddTimelineEntrySchema,
-    IncidentDetailSchema, IncidentSummarySchema, IncidentTimelineSchema,
-    CreateProblemSchema, UpdateProblemSchema,
-    ProblemDetailSchema, ProblemSummarySchema,
-    NotificationSchema, NotificationListQuerySchema,
-)
+from app.utils.constants import AuditAction, UserRole
 from app.utils.decorators import (
-    validate_body, validate_query, role_required,
-    get_current_user_id, get_current_user_role,
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_body,
+    validate_query,
 )
+from app.utils.exceptions import AuthorizationError, NotFoundError
 from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
 )
-from app.utils.constants import UserRole, AuditAction
-from app.utils.exceptions import NotFoundError, AuthorizationError
-from marshmallow import Schema, fields, validate as ma_validate
 
 incident_bp = Blueprint("incidents", __name__, url_prefix="/api/v1/incidents")
 problem_bp = Blueprint("problems", __name__, url_prefix="/api/v1/problems")
@@ -52,6 +68,7 @@ class ProblemListQuerySchema(Schema):
 
 
 # ─── Incident Endpoints ───────────────────────────────────────────────────────
+
 
 @incident_bp.route("/", methods=["POST"])
 @role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -159,6 +176,7 @@ def add_timeline_entry(data: dict, incident_id: int):
 
 # ─── Problem Endpoints ────────────────────────────────────────────────────────
 
+
 @problem_bp.route("/", methods=["POST"])
 @role_required(UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @validate_body(CreateProblemSchema)
@@ -217,6 +235,7 @@ def update_problem(data: dict, problem_id: int):
 
 # ─── Notification Endpoints ───────────────────────────────────────────────────
 
+
 @notification_bp.route("/", methods=["GET"])
 @jwt_required()
 @validate_query(NotificationListQuerySchema)
@@ -244,6 +263,7 @@ def mark_notification_read(notif_id: int):
     user_id = get_current_user_id()
     notif = NotificationRepository.list_for_user(user_id).items  # validate ownership
     from app.models.incident import Notification
+
     notif_obj = Notification.query.filter_by(id=notif_id, user_id=user_id).first()
     if not notif_obj:
         raise NotFoundError("Notification", notif_id)
@@ -264,8 +284,9 @@ def mark_all_notifications_read():
 @jwt_required()
 def delete_notification(notif_id: int):
     """DELETE /api/v1/notifications/:id — Dismiss and delete a notification."""
-    from app.models.incident import Notification
     from app.extensions import db
+    from app.models.incident import Notification
+
     user_id = get_current_user_id()
     notif = Notification.query.filter_by(id=notif_id, user_id=user_id).first()
     if not notif:
@@ -273,4 +294,3 @@ def delete_notification(notif_id: int):
     db.session.delete(notif)
     db.session.commit()
     return success_response({"message": "Notification deleted."})
-

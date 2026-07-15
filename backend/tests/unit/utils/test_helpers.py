@@ -3,16 +3,18 @@ IntelliDesk AI — Helper Utility Unit Tests
 Tests for ID generation, formatting, and file utilities.
 """
 
-import pytest
 import re
+
+import pytest
+
 from app.utils.helpers import (
-    generate_ticket_number,
-    generate_incident_number,
-    generate_problem_number,
     format_bytes,
     format_duration_hours,
-    mask_email,
+    generate_incident_number,
+    generate_problem_number,
+    generate_ticket_number,
     get_file_extension,
+    mask_email,
     sanitize_filename,
 )
 

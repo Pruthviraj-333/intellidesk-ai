@@ -4,6 +4,7 @@ Thin service wrapper over AuditLogRepository for clean imports in other services
 """
 
 from typing import Optional
+
 from flask_jwt_extended import get_jwt_identity
 
 from app.repositories.department_repository import AuditLogRepository

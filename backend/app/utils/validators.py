@@ -4,6 +4,7 @@ Reusable validators for files, emails, passwords, and other inputs.
 """
 
 import re
+
 from flask import current_app
 
 from app.utils.helpers import get_file_extension

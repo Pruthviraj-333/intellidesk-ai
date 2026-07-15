@@ -3,14 +3,14 @@ IntelliDesk AI — Ticket Repository
 Data access layer for Ticket, Comment, and Attachment entities.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import or_, and_
+from sqlalchemy import and_, or_
 
 from app.extensions import db
-from app.models.ticket import Ticket, Comment, Attachment
-from app.utils.constants import TicketStatus, SLA_DEFAULTS, TicketPriority
+from app.models.ticket import Attachment, Comment, Ticket
+from app.utils.constants import SLA_DEFAULTS, TicketPriority, TicketStatus
 from app.utils.helpers import generate_ticket_number
 
 
@@ -77,10 +77,20 @@ class TicketRepository:
     def update(ticket: Ticket, data: dict) -> Ticket:
         """Update allowed ticket fields. Handles resolved_at / closed_at timestamps."""
         allowed_fields = {
-            "title", "description", "status", "priority", "category",
-            "assignee_id", "department_id", "project_id",
-            "resolution_notes", "sla_response_breached", "sla_resolution_breached",
-            "ai_confidence", "ai_category_suggestion", "ai_priority_suggestion",
+            "title",
+            "description",
+            "status",
+            "priority",
+            "category",
+            "assignee_id",
+            "department_id",
+            "project_id",
+            "resolution_notes",
+            "sla_response_breached",
+            "sla_resolution_breached",
+            "ai_confidence",
+            "ai_category_suggestion",
+            "ai_priority_suggestion",
             "ai_metadata",
         }
         now = datetime.now(timezone.utc)
@@ -173,8 +183,9 @@ class TicketRepository:
             query = query.filter(Ticket.created_at <= to_date)
         if search:
             term = f"%{search}%"
-            from app.models.user import User
             from sqlalchemy.orm import aliased
+
+            from app.models.user import User
 
             RequesterUser = aliased(User)
             AssigneeUser = aliased(User)
@@ -207,17 +218,18 @@ class TicketRepository:
         safe_updates = {k: v for k, v in updates.items() if k in allowed}
         if not safe_updates:
             return 0
-        count = Ticket.query.filter(
-            Ticket.id.in_(ticket_ids), Ticket.deleted_at.is_(None)
-        ).update(safe_updates, synchronize_session="fetch")
+        count = Ticket.query.filter(Ticket.id.in_(ticket_ids), Ticket.deleted_at.is_(None)).update(
+            safe_updates, synchronize_session="fetch"
+        )
         db.session.commit()
         return count
 
     @staticmethod
     def get_dashboard_stats(department_id: Optional[int] = None) -> dict:
         """Aggregate ticket statistics for dashboard KPIs."""
-        from sqlalchemy import func
         from datetime import date
+
+        from sqlalchemy import func
 
         base = Ticket.query.filter_by(deleted_at=None)
         if department_id:
@@ -229,9 +241,7 @@ class TicketRepository:
             "open_tickets": base.filter(
                 Ticket.status.notin_([TicketStatus.RESOLVED.value, TicketStatus.CLOSED.value])
             ).count(),
-            "resolved_today": base.filter(
-                Ticket.resolved_at >= today_start
-            ).count(),
+            "resolved_today": base.filter(Ticket.resolved_at >= today_start).count(),
             "overdue_tickets": base.filter(
                 Ticket.sla_resolution_breached == True,  # noqa: E712
                 Ticket.status.notin_([TicketStatus.RESOLVED.value, TicketStatus.CLOSED.value]),
@@ -239,12 +249,14 @@ class TicketRepository:
             "by_status": dict(
                 db.session.query(Ticket.status, func.count(Ticket.id))
                 .filter(Ticket.deleted_at.is_(None))
-                .group_by(Ticket.status).all()
+                .group_by(Ticket.status)
+                .all()
             ),
             "by_priority": dict(
                 db.session.query(Ticket.priority, func.count(Ticket.id))
                 .filter(Ticket.deleted_at.is_(None))
-                .group_by(Ticket.priority).all()
+                .group_by(Ticket.priority)
+                .all()
             ),
         }
 

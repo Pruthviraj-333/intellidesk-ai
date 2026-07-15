@@ -3,10 +3,10 @@ IntelliDesk AI — Analytics & Report API Integration Tests
 Tests for /api/v1/analytics/* and /api/v1/reports/* endpoints.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 from datetime import date, timedelta
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ─── Mock analytics data ──────────────────────────────────────────────────────
 
@@ -71,8 +71,10 @@ class TestAnalyticsSummary:
     """Tests for GET /api/v1/analytics/summary"""
 
     def test_admin_gets_platform_summary(self, client, auth_headers_admin):
-        with patch("app.services.analytics_service.AnalyticsService.get_platform_summary",
-                   return_value=MOCK_PLATFORM_SUMMARY):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_platform_summary",
+            return_value=MOCK_PLATFORM_SUMMARY,
+        ):
             resp = client.get("/api/v1/analytics/summary", headers=auth_headers_admin)
 
         assert resp.status_code == 200
@@ -84,8 +86,10 @@ class TestAnalyticsSummary:
         assert "ai_sessions_total" in data
 
     def test_manager_can_access_summary(self, client, auth_headers_manager):
-        with patch("app.services.analytics_service.AnalyticsService.get_platform_summary",
-                   return_value=MOCK_PLATFORM_SUMMARY):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_platform_summary",
+            return_value=MOCK_PLATFORM_SUMMARY,
+        ):
             resp = client.get("/api/v1/analytics/summary", headers=auth_headers_manager)
         assert resp.status_code == 200
 
@@ -106,8 +110,10 @@ class TestTrends:
     """Tests for GET /api/v1/analytics/trends"""
 
     def test_admin_gets_trend_data(self, client, auth_headers_admin):
-        with patch("app.services.analytics_service.AnalyticsService.get_trend_data",
-                   return_value=MOCK_TRENDS):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_trend_data",
+            return_value=MOCK_TRENDS,
+        ):
             resp = client.get("/api/v1/analytics/trends?days=7", headers=auth_headers_admin)
 
         assert resp.status_code == 200
@@ -125,8 +131,9 @@ class TestTrends:
         assert resp.status_code == 400  # min=7
 
     def test_trends_with_department_filter(self, client, auth_headers_manager):
-        with patch("app.services.analytics_service.AnalyticsService.get_trend_data",
-                   return_value=[]) as mock_trend:
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_trend_data", return_value=[]
+        ) as mock_trend:
             resp = client.get(
                 "/api/v1/analytics/trends?days=30&department_id=1",
                 headers=auth_headers_manager,
@@ -145,8 +152,10 @@ class TestSLACompliance:
             "medium": {"total": 120, "compliant": 115, "breached": 5, "compliance_rate": 95.8},
             "low": {"total": 200, "compliant": 198, "breached": 2, "compliance_rate": 99.0},
         }
-        with patch("app.services.analytics_service.AnalyticsService.get_sla_compliance_by_priority",
-                   return_value=mock_sla):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_sla_compliance_by_priority",
+            return_value=mock_sla,
+        ):
             resp = client.get("/api/v1/analytics/sla-compliance", headers=auth_headers_admin)
 
         assert resp.status_code == 200
@@ -166,8 +175,10 @@ class TestAgentLeaderboard:
     """Tests for GET /api/v1/analytics/agent-leaderboard"""
 
     def test_leaderboard_returns_ranked_agents(self, client, auth_headers_admin):
-        with patch("app.services.analytics_service.AnalyticsService.get_agent_leaderboard",
-                   return_value=MOCK_LEADERBOARD):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_agent_leaderboard",
+            return_value=MOCK_LEADERBOARD,
+        ):
             resp = client.get(
                 "/api/v1/analytics/agent-leaderboard?days=30&limit=5",
                 headers=auth_headers_admin,
@@ -193,8 +204,10 @@ class TestHeatmap:
     """Tests for GET /api/v1/analytics/heatmap"""
 
     def test_heatmap_data_structure(self, client, auth_headers_admin):
-        with patch("app.services.analytics_service.AnalyticsService.get_heatmap_data",
-                   return_value=MOCK_HEATMAP):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_heatmap_data",
+            return_value=MOCK_HEATMAP,
+        ):
             resp = client.get("/api/v1/analytics/heatmap?days=90", headers=auth_headers_admin)
 
         assert resp.status_code == 200
@@ -219,8 +232,10 @@ class TestTicketVolume:
             {"category": "Network", "count": 87},
             {"category": "Hardware", "count": 62},
         ]
-        with patch("app.services.analytics_service.AnalyticsService.get_ticket_volume_by_category",
-                   return_value=mock_volume):
+        with patch(
+            "app.services.analytics_service.AnalyticsService.get_ticket_volume_by_category",
+            return_value=mock_volume,
+        ):
             resp = client.get("/api/v1/analytics/ticket-volume", headers=auth_headers_admin)
 
         assert resp.status_code == 200
@@ -247,8 +262,9 @@ class TestReportDownloads:
         assert "Excel (.xlsx)" in formats
 
     def test_employee_cannot_access_reports(self, client, auth_headers_employee):
-        resp = client.get(f"/api/v1/reports/tickets/pdf{self.VALID_PARAMS}",
-                          headers=auth_headers_employee)
+        resp = client.get(
+            f"/api/v1/reports/tickets/pdf{self.VALID_PARAMS}", headers=auth_headers_employee
+        )
         assert resp.status_code == 403
 
     def test_missing_date_params_rejected(self, client, auth_headers_admin):
@@ -268,10 +284,13 @@ class TestReportDownloads:
         mock_buffer.seek.return_value = None
 
         import io
+
         real_buffer = io.BytesIO(b"%PDF-1.4 fake-pdf-content")
 
-        with patch("app.services.report_service.ReportService.generate_ticket_report_pdf",
-                   return_value=real_buffer):
+        with patch(
+            "app.services.report_service.ReportService.generate_ticket_report_pdf",
+            return_value=real_buffer,
+        ):
             resp = client.get(
                 f"/api/v1/reports/tickets/pdf{self.VALID_PARAMS}",
                 headers=auth_headers_admin,
@@ -281,11 +300,13 @@ class TestReportDownloads:
 
     def test_csv_report_returns_csv_content_type(self, client, auth_headers_admin):
         import io
+
         csv_content = "Ticket Number,Title\nTKT-20260101-0001,Test ticket\n"
         real_buffer = io.BytesIO(csv_content.encode("utf-8-sig"))
 
-        with patch("app.services.report_service.ReportService.export_tickets_csv",
-                   return_value=real_buffer):
+        with patch(
+            "app.services.report_service.ReportService.export_tickets_csv", return_value=real_buffer
+        ):
             resp = client.get(
                 f"/api/v1/reports/tickets/csv{self.VALID_PARAMS}",
                 headers=auth_headers_admin,
@@ -295,10 +316,13 @@ class TestReportDownloads:
 
     def test_excel_report_returns_xlsx_content_type(self, client, auth_headers_admin):
         import io
+
         real_buffer = io.BytesIO(b"PK\x03\x04fake-xlsx-content")
 
-        with patch("app.services.report_service.ReportService.export_analytics_excel",
-                   return_value=real_buffer):
+        with patch(
+            "app.services.report_service.ReportService.export_analytics_excel",
+            return_value=real_buffer,
+        ):
             resp = client.get(
                 f"/api/v1/reports/analytics/excel{self.VALID_PARAMS}",
                 headers=auth_headers_admin,

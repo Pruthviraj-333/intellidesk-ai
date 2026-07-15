@@ -7,11 +7,12 @@ import functools
 from typing import Callable
 
 from flask import request
-from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
-from marshmallow import Schema, ValidationError as MarshmallowValidationError
+from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
+from marshmallow import Schema
+from marshmallow import ValidationError as MarshmallowValidationError
 
-from app.utils.exceptions import AuthorizationError, ValidationError
 from app.utils.constants import UserRole
+from app.utils.exceptions import AuthorizationError, ValidationError
 
 
 def jwt_required(f: Callable) -> Callable:
@@ -147,4 +148,3 @@ def get_current_user_department_id() -> int | None:
 # Alias: allows controllers to use @jwt_required_any when they apply
 # role_required separately at the handler level rather than the route level.
 jwt_required_any = jwt_required
-

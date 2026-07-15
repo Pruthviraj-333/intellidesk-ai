@@ -5,23 +5,26 @@ HTTP handlers for department management and system health endpoints.
 
 from flask import Blueprint
 from flask_jwt_extended import jwt_required
-
-from app.repositories.department_repository import DepartmentRepository, AuditLogRepository
-from app.services.audit_service import AuditService
-from app.dtos.auth_dto import (
-    DepartmentResponseSchema,
-    CreateDepartmentSchema,
-    UpdateDepartmentSchema,
-    AuditLogResponseSchema,
-)
-from app.utils.decorators import role_required, validate_body, validate_query
-from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
-)
-from app.utils.constants import UserRole, AuditAction
-from app.utils.exceptions import NotFoundError, ConflictError
 from marshmallow import Schema, fields, validate
+
+from app.dtos.auth_dto import (
+    AuditLogResponseSchema,
+    CreateDepartmentSchema,
+    DepartmentResponseSchema,
+    UpdateDepartmentSchema,
+)
+from app.repositories.department_repository import AuditLogRepository, DepartmentRepository
+from app.services.audit_service import AuditService
+from app.utils.constants import AuditAction, UserRole
+from app.utils.decorators import role_required, validate_body, validate_query
+from app.utils.exceptions import ConflictError, NotFoundError
+from app.utils.response import (
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 department_bp = Blueprint("departments", __name__, url_prefix="/api/v1/departments")
 
@@ -138,11 +141,14 @@ health_bp = Blueprint("health", __name__, url_prefix="/api/v1")
 def health_check():
     """GET /api/v1/health — Public health check endpoint."""
     import os
-    return success_response({
-        "status": "healthy",
-        "version": "1.0.0",
-        "environment": os.environ.get("FLASK_ENV", "development"),
-    })
+
+    return success_response(
+        {
+            "status": "healthy",
+            "version": "1.0.0",
+            "environment": os.environ.get("FLASK_ENV", "development"),
+        }
+    )
 
 
 @health_bp.route("/health/detailed", methods=["GET"])
@@ -150,6 +156,7 @@ def health_check():
 def health_detailed():
     """GET /api/v1/health/detailed — Detailed health status (Admin+)."""
     import time
+
     import redis as redis_lib
     from flask import current_app
 
@@ -159,8 +166,12 @@ def health_detailed():
     try:
         start = time.time()
         from app.extensions import db
+
         db.session.execute(db.text("SELECT 1"))
-        results["database"] = {"status": "healthy", "latency_ms": round((time.time() - start) * 1000)}
+        results["database"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start) * 1000),
+        }
     except Exception as e:
         results["database"] = {"status": "unhealthy", "error": str(e)}
 
@@ -176,13 +187,17 @@ def health_detailed():
     # ChromaDB check (optional — may not be running in dev)
     try:
         import chromadb
+
         start = time.time()
         client = chromadb.HttpClient(
             host=current_app.config["CHROMA_HOST"],
             port=current_app.config["CHROMA_PORT"],
         )
         client.heartbeat()
-        results["chromadb"] = {"status": "healthy", "latency_ms": round((time.time() - start) * 1000)}
+        results["chromadb"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start) * 1000),
+        }
     except Exception:
         results["chromadb"] = {"status": "unavailable"}
 
@@ -192,13 +207,18 @@ def health_detailed():
         "status": "configured" if groq_key else "not_configured",
     }
 
-    overall = "healthy" if all(
-        v.get("status") in ("healthy", "configured", "unavailable")
-        for v in results.values()
-    ) else "degraded"
+    overall = (
+        "healthy"
+        if all(
+            v.get("status") in ("healthy", "configured", "unavailable") for v in results.values()
+        )
+        else "degraded"
+    )
 
-    return success_response({
-        "status": overall,
-        "version": "1.0.0",
-        "services": results,
-    })
+    return success_response(
+        {
+            "status": overall,
+            "version": "1.0.0",
+            "services": results,
+        }
+    )

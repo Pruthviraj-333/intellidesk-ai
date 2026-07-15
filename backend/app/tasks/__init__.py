@@ -81,6 +81,7 @@ def make_celery(app=None) -> Celery:
     if app is None:
         try:
             from app import create_app
+
             app = create_app()
         except Exception:
             pass

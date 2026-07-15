@@ -5,9 +5,10 @@ Data access layer for organizational and audit entities.
 
 from typing import Optional
 
-from app.extensions import db
-from app.models.department import Department, AuditLog, Setting
 from flask import request
+
+from app.extensions import db
+from app.models.department import AuditLog, Department, Setting
 
 
 class DepartmentRepository:
@@ -42,8 +43,9 @@ class DepartmentRepository:
         return query.paginate(page=page, per_page=per_page, error_out=False)
 
     @staticmethod
-    def create(name: str, description: Optional[str] = None,
-               manager_id: Optional[int] = None) -> Department:
+    def create(
+        name: str, description: Optional[str] = None, manager_id: Optional[int] = None
+    ) -> Department:
         dept = Department(name=name, description=description, manager_id=manager_id)
         db.session.add(dept)
         db.session.commit()
@@ -141,8 +143,13 @@ class SettingRepository:
         return setting.typed_value
 
     @staticmethod
-    def set_value(key: str, value, value_type: str = "string",
-                  description: Optional[str] = None, user_id: Optional[int] = None):
+    def set_value(
+        key: str,
+        value,
+        value_type: str = "string",
+        description: Optional[str] = None,
+        user_id: Optional[int] = None,
+    ):
         setting = Setting.query.filter_by(key=key).first()
         str_value = str(value) if value is not None else None
 
@@ -151,8 +158,11 @@ class SettingRepository:
             setting.updated_by = user_id
         else:
             setting = Setting(
-                key=key, value=str_value,
-                value_type=value_type, description=description, updated_by=user_id
+                key=key,
+                value=str_value,
+                value_type=value_type,
+                description=description,
+                updated_by=user_id,
             )
             db.session.add(setting)
 

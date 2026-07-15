@@ -8,6 +8,7 @@ import time
 from typing import Optional
 
 from flask import current_app
+
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -21,6 +22,7 @@ def get_groq_client():
     global _groq_client
     if _groq_client is None:
         from groq import Groq
+
         api_key = current_app.config.get("GROQ_API_KEY")
         if not api_key:
             raise RuntimeError("GROQ_API_KEY is not configured.")
@@ -122,7 +124,10 @@ Respond with ONLY this JSON (no markdown, no explanation):
 }}"""
 
         messages = [
-            {"role": "system", "content": "You are a precise IT ticket classifier. Return only valid JSON."},
+            {
+                "role": "system",
+                "content": "You are a precise IT ticket classifier. Return only valid JSON.",
+            },
             {"role": "user", "content": prompt},
         ]
 
@@ -166,10 +171,7 @@ Respond with ONLY this JSON (no markdown, no explanation):
         Returns:
             Suggested response text.
         """
-        context_section = (
-            f"\n\nRelevant knowledge base context:\n{context}"
-            if context else ""
-        )
+        context_section = f"\n\nRelevant knowledge base context:\n{context}" if context else ""
 
         prompt = f"""A user submitted the following IT support ticket:
 
@@ -204,8 +206,7 @@ If the issue requires further investigation, say so. Do not make up technical de
             Summarized thread as text.
         """
         thread_text = "\n".join(
-            f"[{c['created_at']}] {c['author']} ({c['role']}): {c['body']}"
-            for c in comments
+            f"[{c['created_at']}] {c['author']} ({c['role']}): {c['body']}" for c in comments
         )
 
         prompt = f"""Summarize this IT support ticket thread in 3-5 bullet points.

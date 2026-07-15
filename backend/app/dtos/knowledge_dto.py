@@ -5,8 +5,8 @@ Request validation and response serialization for knowledge and document endpoin
 
 from marshmallow import Schema, fields, validate
 
-
 # ─── Category Schemas ─────────────────────────────────────────────────────────
+
 
 class ArticleCategorySchema(Schema):
     id = fields.Int(dump_only=True)
@@ -30,6 +30,7 @@ class CreateCategorySchema(Schema):
 
 # ─── Tag Schemas ──────────────────────────────────────────────────────────────
 
+
 class ArticleTagSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(dump_only=True)
@@ -38,6 +39,7 @@ class ArticleTagSchema(Schema):
 
 
 # ─── Article Schemas ──────────────────────────────────────────────────────────
+
 
 class AuthorMiniSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -50,6 +52,7 @@ class AuthorMiniSchema(Schema):
 
 class ArticleSummarySchema(Schema):
     """Compact article for list views and suggestions."""
+
     id = fields.Int(dump_only=True)
     slug = fields.Str(dump_only=True)
     title = fields.Str(dump_only=True)
@@ -69,6 +72,7 @@ class ArticleSummarySchema(Schema):
 
 class ArticleDetailSchema(ArticleSummarySchema):
     """Full article including body and version info."""
+
     body = fields.Str(dump_only=True)
     version = fields.Int(dump_only=True)
     reviewer = fields.Nested(AuthorMiniSchema, dump_only=True, allow_none=True)
@@ -120,6 +124,7 @@ class VoteArticleSchema(Schema):
 
 # ─── Semantic Search Schemas ──────────────────────────────────────────────────
 
+
 class SearchQuerySchema(Schema):
     q = fields.Str(required=True, validate=validate.Length(min=3, max=500))
     n_results = fields.Int(load_default=5, validate=validate.Range(min=1, max=20))
@@ -134,6 +139,7 @@ class SearchResultSchema(Schema):
 
 
 # ─── Document Schemas ─────────────────────────────────────────────────────────
+
 
 class DocumentResponseSchema(Schema):
     id = fields.Int(dump_only=True)

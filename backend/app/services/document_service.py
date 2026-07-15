@@ -7,12 +7,13 @@ import io
 from typing import Optional
 
 from flask import current_app
+
 from app.models.document import Document
 from app.repositories.document_repository import DocumentRepository
 from app.services.rag_service import RAGService
-from app.utils.exceptions import ValidationError, BusinessLogicError
-from app.utils.helpers import get_file_extension
 from app.utils.constants import ALLOWED_DOCUMENT_EXTENSIONS
+from app.utils.exceptions import BusinessLogicError, ValidationError
+from app.utils.helpers import get_file_extension
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -89,6 +90,7 @@ class DocumentService:
         else:
             # Queue Celery task for async processing
             from app.tasks.document_tasks import process_document_task
+
             process_document_task.delay(document.id)
 
         return document
@@ -182,6 +184,7 @@ class DocumentService:
         """Extract text from PDF bytes using PyPDF2."""
         try:
             import PyPDF2
+
             reader = PyPDF2.PdfReader(io.BytesIO(content))
             pages = [page.extract_text() or "" for page in reader.pages]
             return "\n\n".join(pages)
@@ -193,6 +196,7 @@ class DocumentService:
         """Extract text from DOCX bytes using python-docx."""
         try:
             import docx
+
             doc = docx.Document(io.BytesIO(content))
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return "\n\n".join(paragraphs)
@@ -223,6 +227,7 @@ class DocumentService:
         if is_placeholder:
             # ── Local storage fallback (development only) ──────────────────
             import os
+
             upload_dir = os.path.join("/app", "uploads")
             os.makedirs(upload_dir, exist_ok=True)
 
@@ -261,4 +266,3 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Cloudinary upload failed for {file_name}: {e}")
             raise BusinessLogicError(f"File upload failed: {e}")
-

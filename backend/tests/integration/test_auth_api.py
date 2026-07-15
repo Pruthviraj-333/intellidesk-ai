@@ -10,13 +10,16 @@ class TestRegister:
     """Tests for POST /api/v1/auth/register"""
 
     def test_register_success(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "newuser@test.com",
-            "password": "NewUser@123!",
-            "confirm_password": "NewUser@123!",
-            "first_name": "New",
-            "last_name": "User",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "newuser@test.com",
+                "password": "NewUser@123!",
+                "confirm_password": "NewUser@123!",
+                "first_name": "New",
+                "last_name": "User",
+            },
+        )
         assert resp.status_code == 201
         data = resp.get_json()
         assert data["status"] == "success"
@@ -25,52 +28,67 @@ class TestRegister:
         assert data["data"]["user"]["status"] == "pending_verification"
 
     def test_register_duplicate_email(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "employee@test.com",  # Already seeded
-            "password": "Test@12345!",
-            "confirm_password": "Test@12345!",
-            "first_name": "Dup",
-            "last_name": "User",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "employee@test.com",  # Already seeded
+                "password": "Test@12345!",
+                "confirm_password": "Test@12345!",
+                "first_name": "Dup",
+                "last_name": "User",
+            },
+        )
         assert resp.status_code == 409
         assert resp.get_json()["error"]["code"] == "CONFLICT"
 
     def test_register_password_mismatch(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "mismatch@test.com",
-            "password": "Test@12345!",
-            "confirm_password": "Different@123!",
-            "first_name": "Test",
-            "last_name": "User",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "mismatch@test.com",
+                "password": "Test@12345!",
+                "confirm_password": "Different@123!",
+                "first_name": "Test",
+                "last_name": "User",
+            },
+        )
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
     def test_register_weak_password(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "weak@test.com",
-            "password": "password",
-            "confirm_password": "password",
-            "first_name": "Test",
-            "last_name": "User",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "weak@test.com",
+                "password": "password",
+                "confirm_password": "password",
+                "first_name": "Test",
+                "last_name": "User",
+            },
+        )
         assert resp.status_code == 400
 
     def test_register_missing_required_fields(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "incomplete@test.com",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "incomplete@test.com",
+            },
+        )
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
 
     def test_register_invalid_email(self, client):
-        resp = client.post("/api/v1/auth/register", json={
-            "email": "not-an-email",
-            "password": "Test@12345!",
-            "confirm_password": "Test@12345!",
-            "first_name": "Test",
-            "last_name": "User",
-        })
+        resp = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "not-an-email",
+                "password": "Test@12345!",
+                "confirm_password": "Test@12345!",
+                "first_name": "Test",
+                "last_name": "User",
+            },
+        )
         assert resp.status_code == 400
 
 
@@ -78,10 +96,13 @@ class TestLogin:
     """Tests for POST /api/v1/auth/login"""
 
     def test_login_success(self, client):
-        resp = client.post("/api/v1/auth/login", json={
-            "email": "employee@test.com",
-            "password": "Test@12345!",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "employee@test.com",
+                "password": "Test@12345!",
+            },
+        )
         assert resp.status_code == 200
         data = resp.get_json()["data"]
         assert "access_token" in data
@@ -90,18 +111,24 @@ class TestLogin:
         assert data["user"]["email"] == "employee@test.com"
 
     def test_login_wrong_password(self, client):
-        resp = client.post("/api/v1/auth/login", json={
-            "email": "employee@test.com",
-            "password": "WrongPassword@123",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "employee@test.com",
+                "password": "WrongPassword@123",
+            },
+        )
         assert resp.status_code == 401
         assert resp.get_json()["error"]["code"] == "UNAUTHORIZED"
 
     def test_login_nonexistent_email(self, client):
-        resp = client.post("/api/v1/auth/login", json={
-            "email": "nobody@test.com",
-            "password": "Test@12345!",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "nobody@test.com",
+                "password": "Test@12345!",
+            },
+        )
         assert resp.status_code == 401
 
     def test_login_missing_fields(self, client):
@@ -109,10 +136,13 @@ class TestLogin:
         assert resp.status_code == 400
 
     def test_login_returns_user_role(self, client):
-        resp = client.post("/api/v1/auth/login", json={
-            "email": "admin@test.com",
-            "password": "Test@12345!",
-        })
+        resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "admin@test.com",
+                "password": "Test@12345!",
+            },
+        )
         assert resp.status_code == 200
         user = resp.get_json()["data"]["user"]
         assert user["role"] == "admin"
@@ -123,10 +153,13 @@ class TestTokenRefresh:
 
     def test_refresh_success(self, client):
         # Login first
-        login_resp = client.post("/api/v1/auth/login", json={
-            "email": "agent@test.com",
-            "password": "Test@12345!",
-        })
+        login_resp = client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "agent@test.com",
+                "password": "Test@12345!",
+            },
+        )
         refresh_token = login_resp.get_json()["data"]["refresh_token"]
 
         # Use refresh token
@@ -167,24 +200,23 @@ class TestPasswordReset:
     """Tests for forgot and reset password flows."""
 
     def test_forgot_password_existing_email(self, client):
-        resp = client.post("/api/v1/auth/forgot-password", json={
-            "email": "employee@test.com"
-        })
+        resp = client.post("/api/v1/auth/forgot-password", json={"email": "employee@test.com"})
         # Always 200 regardless of email existence
         assert resp.status_code == 200
 
     def test_forgot_password_nonexistent_email(self, client):
-        resp = client.post("/api/v1/auth/forgot-password", json={
-            "email": "nobody@test.com"
-        })
+        resp = client.post("/api/v1/auth/forgot-password", json={"email": "nobody@test.com"})
         assert resp.status_code == 200  # No enumeration
 
     def test_reset_password_invalid_token(self, client):
-        resp = client.post("/api/v1/auth/reset-password", json={
-            "token": "invalid-token-xyz",
-            "password": "NewPass@123!",
-            "confirm_password": "NewPass@123!",
-        })
+        resp = client.post(
+            "/api/v1/auth/reset-password",
+            json={
+                "token": "invalid-token-xyz",
+                "password": "NewPass@123!",
+                "confirm_password": "NewPass@123!",
+            },
+        )
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "VALIDATION_ERROR"
 

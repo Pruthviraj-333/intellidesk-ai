@@ -3,9 +3,10 @@ IntelliDesk AI — LLM Service Unit Tests
 Tests for ticket classification, response suggestion, and model fallback logic.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, call
 import json
+from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 
 class TestTicketClassification:
@@ -24,13 +25,16 @@ class TestTicketClassification:
     def test_classify_returns_structured_result(self, app):
         with app.app_context():
             from app.services.llm_service import LLMService
-            mock_result = self._mock_groq_response({
-                "category": "Hardware",
-                "priority": "high",
-                "department_name": "IT Support",
-                "confidence": 0.9,
-                "reasoning": "Screen blackout is a hardware issue.",
-            })
+
+            mock_result = self._mock_groq_response(
+                {
+                    "category": "Hardware",
+                    "priority": "high",
+                    "department_name": "IT Support",
+                    "confidence": 0.9,
+                    "reasoning": "Screen blackout is a hardware issue.",
+                }
+            )
             with patch.object(LLMService, "chat_completion", return_value=mock_result):
                 result = LLMService.classify_ticket(
                     "Screen goes black", "Laptop screen goes black on login"
@@ -42,6 +46,7 @@ class TestTicketClassification:
     def test_classify_falls_back_on_json_error(self, app):
         with app.app_context():
             from app.services.llm_service import LLMService
+
             # LLM returns malformed JSON
             bad_result = {
                 "content": "I think this is a hardware issue",
@@ -51,9 +56,7 @@ class TestTicketClassification:
                 "latency_ms": 200,
             }
             with patch.object(LLMService, "chat_completion", return_value=bad_result):
-                result = LLMService.classify_ticket(
-                    "Screen issue", "Laptop broken"
-                )
+                result = LLMService.classify_ticket("Screen issue", "Laptop broken")
             # Should return safe defaults
             assert result["category"] == "General"
             assert result["priority"] == "medium"
@@ -62,6 +65,7 @@ class TestTicketClassification:
     def test_classify_handles_groq_failure_gracefully(self, app):
         with app.app_context():
             from app.services.llm_service import LLMService
+
             with patch.object(LLMService, "chat_completion", side_effect=RuntimeError("Groq down")):
                 result = LLMService.classify_ticket("Issue", "Description of the issue")
             # Should return defaults, not raise
@@ -188,8 +192,18 @@ class TestSummarizeThread:
                 return mock_result
 
             comments = [
-                {"author": "Alice", "role": "Employee", "body": "VPN not working", "created_at": "2026-07-01 09:00"},
-                {"author": "Bob", "role": "Agent", "body": "Checking the config", "created_at": "2026-07-01 09:15"},
+                {
+                    "author": "Alice",
+                    "role": "Employee",
+                    "body": "VPN not working",
+                    "created_at": "2026-07-01 09:00",
+                },
+                {
+                    "author": "Bob",
+                    "role": "Agent",
+                    "body": "Checking the config",
+                    "created_at": "2026-07-01 09:15",
+                },
             ]
 
             with patch.object(LLMService, "chat_completion", side_effect=capture):

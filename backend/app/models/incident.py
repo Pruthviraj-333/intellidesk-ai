@@ -6,9 +6,8 @@ ITIL-aligned incident and problem management entities.
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
-from app.utils.constants import IncidentStatus, IncidentSeverity
-
+from app.models.base import SoftDeleteMixin, TimestampMixin
+from app.utils.constants import IncidentSeverity, IncidentStatus
 
 # ─── Association Table: incidents ↔ tickets ────────────────────────────────────
 incident_tickets = db.Table(
@@ -84,8 +83,10 @@ class Incident(db.Model, TimestampMixin, SoftDeleteMixin):
     assignee = db.relationship("User", foreign_keys=[assignee_id], backref="assigned_incidents")
     department = db.relationship("Department", foreign_keys=[department_id], backref="incidents")
     timeline = db.relationship(
-        "IncidentTimeline", back_populates="incident",
-        cascade="all, delete-orphan", order_by="IncidentTimeline.created_at"
+        "IncidentTimeline",
+        back_populates="incident",
+        cascade="all, delete-orphan",
+        order_by="IncidentTimeline.created_at",
     )
     linked_tickets = db.relationship("Ticket", secondary=incident_tickets, backref="incidents")
     problem = db.relationship("Problem", foreign_keys=[problem_id], backref="incidents")
@@ -108,8 +109,7 @@ class IncidentTimeline(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     incident_id = db.Column(
-        db.Integer, db.ForeignKey("incidents.id", ondelete="CASCADE"),
-        nullable=False, index=True
+        db.Integer, db.ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True
     )
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     event_type = db.Column(db.String(50), nullable=False)
@@ -169,8 +169,7 @@ class Notification(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False, index=True
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     type = db.Column(db.String(50), nullable=False)
     title = db.Column(db.String(200), nullable=False)

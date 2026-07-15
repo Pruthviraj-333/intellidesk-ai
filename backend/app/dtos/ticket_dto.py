@@ -3,15 +3,18 @@ IntelliDesk AI — Ticket & Comment DTOs (Marshmallow Schemas)
 Request validation and response serialization for ticket endpoints.
 """
 
-from marshmallow import Schema, fields, validate, validates, ValidationError
+from marshmallow import Schema, ValidationError, fields, validate, validates
 
 from app.utils.constants import (
-    TicketStatus, TicketPriority, TicketCategory,
-    IncidentSeverity, IncidentStatus,
+    IncidentSeverity,
+    IncidentStatus,
+    TicketCategory,
+    TicketPriority,
+    TicketStatus,
 )
 
-
 # ─── Nested summary schemas (reused across resources) ─────────────────────────
+
 
 class UserMiniSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -30,6 +33,7 @@ class DeptMiniSchema(Schema):
 
 # ─── Attachment Schema ─────────────────────────────────────────────────────────
 
+
 class AttachmentSchema(Schema):
     id = fields.Int(dump_only=True)
     file_name = fields.Str(dump_only=True)
@@ -41,6 +45,7 @@ class AttachmentSchema(Schema):
 
 
 # ─── Comment Schemas ──────────────────────────────────────────────────────────
+
 
 class CommentResponseSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -60,8 +65,10 @@ class CreateCommentSchema(Schema):
 
 # ─── Ticket Response Schema ────────────────────────────────────────────────────
 
+
 class TicketSummarySchema(Schema):
     """Compact ticket representation for list views."""
+
     id = fields.Int(dump_only=True)
     ticket_number = fields.Str(dump_only=True)
     title = fields.Str(dump_only=True)
@@ -83,6 +90,7 @@ class TicketSummarySchema(Schema):
 
 class TicketDetailSchema(TicketSummarySchema):
     """Full ticket representation for detail view — includes comments and attachments."""
+
     description = fields.Str(dump_only=True)
     resolution_notes = fields.Str(dump_only=True, allow_none=True)
     first_responded_at = fields.DateTime(dump_only=True, allow_none=True)
@@ -97,12 +105,12 @@ class TicketDetailSchema(TicketSummarySchema):
 
 # ─── Ticket Request Schemas ────────────────────────────────────────────────────
 
+
 class CreateTicketSchema(Schema):
     title = fields.Str(required=True, validate=validate.Length(min=5, max=200))
     description = fields.Str(required=True, validate=validate.Length(min=10, max=10000))
     priority = fields.Str(
-        load_default=None,
-        validate=validate.OneOf([p.value for p in TicketPriority])
+        load_default=None, validate=validate.OneOf([p.value for p in TicketPriority])
     )
     category = fields.Str(load_default=None, validate=validate.Length(max=50))
     department_id = fields.Int(load_default=None)
@@ -143,7 +151,9 @@ class TicketListQuerySchema(Schema):
     search = fields.Str(validate=validate.Length(max=200))
     sort_by = fields.Str(
         load_default="created_at",
-        validate=validate.OneOf(["created_at", "updated_at", "priority", "sla_resolution_deadline"]),
+        validate=validate.OneOf(
+            ["created_at", "updated_at", "priority", "sla_resolution_deadline"]
+        ),
     )
     order = fields.Str(load_default="desc", validate=validate.OneOf(["asc", "desc"]))
     page = fields.Int(load_default=1, validate=validate.Range(min=1))
@@ -151,6 +161,7 @@ class TicketListQuerySchema(Schema):
 
 
 # ─── Incident Schemas ─────────────────────────────────────────────────────────
+
 
 class IncidentTimelineSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -188,13 +199,9 @@ class CreateIncidentSchema(Schema):
     title = fields.Str(required=True, validate=validate.Length(min=5, max=200))
     description = fields.Str(required=True, validate=validate.Length(min=10))
     severity = fields.Str(
-        required=True,
-        validate=validate.OneOf([s.value for s in IncidentSeverity])
+        required=True, validate=validate.OneOf([s.value for s in IncidentSeverity])
     )
-    impact = fields.Str(
-        load_default=None,
-        validate=validate.OneOf(["high", "medium", "low"])
-    )
+    impact = fields.Str(load_default=None, validate=validate.OneOf(["high", "medium", "low"]))
     affected_services = fields.Str(load_default=None)
     department_id = fields.Int(load_default=None)
     linked_ticket_ids = fields.List(fields.Int(), load_default=[])
@@ -216,16 +223,24 @@ class UpdateIncidentSchema(Schema):
 class AddTimelineEntrySchema(Schema):
     event_type = fields.Str(
         required=True,
-        validate=validate.OneOf([
-            "created", "assigned", "escalated", "update",
-            "communication", "resolved", "postmortem",
-        ])
+        validate=validate.OneOf(
+            [
+                "created",
+                "assigned",
+                "escalated",
+                "update",
+                "communication",
+                "resolved",
+                "postmortem",
+            ]
+        ),
     )
     description = fields.Str(required=True, validate=validate.Length(min=5, max=2000))
     metadata = fields.Dict(load_default={})
 
 
 # ─── Problem Schemas ──────────────────────────────────────────────────────────
+
 
 class ProblemSummarySchema(Schema):
     id = fields.Int(dump_only=True)
@@ -263,6 +278,7 @@ class UpdateProblemSchema(Schema):
 
 
 # ─── Notification Schema ───────────────────────────────────────────────────────
+
 
 class NotificationSchema(Schema):
     id = fields.Int(dump_only=True)

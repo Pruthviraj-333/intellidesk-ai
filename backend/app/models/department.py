@@ -6,7 +6,7 @@ Organizational structure and system-level entities.
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin
 
 
 class Department(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -78,6 +78,7 @@ class Setting(db.Model):
             return self.value.lower() in ("true", "1", "yes")
         if self.value_type == "json":
             import json
+
             return json.loads(self.value)
         return self.value  # string (default)
 

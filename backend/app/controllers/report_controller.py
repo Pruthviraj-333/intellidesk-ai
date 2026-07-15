@@ -6,12 +6,12 @@ Route prefix: /api/v1/reports
 
 from datetime import date, timedelta
 
-from flask import Blueprint, send_file, request
+from flask import Blueprint, request, send_file
 
-from app.services.report_service import ReportService
 from app.dtos.analytics_dto import ReportQuerySchema
-from app.utils.decorators import validate_query, role_required
+from app.services.report_service import ReportService
 from app.utils.constants import UserRole
+from app.utils.decorators import role_required, validate_query
 from app.utils.exceptions import ValidationError
 from app.utils.response import success_response
 
@@ -104,38 +104,40 @@ def list_available_reports():
     last_month_end = month_start - timedelta(days=1)
     last_month_start = last_month_end.replace(day=1)
 
-    return success_response([
-        {
-            "id": "ticket_performance_pdf",
-            "name": "Ticket Performance Report",
-            "format": "PDF",
-            "description": "Summary of ticket KPIs, SLA compliance, and priority breakdown.",
-            "endpoint": "/api/v1/reports/tickets/pdf",
-            "suggested_period": {
-                "from_date": str(last_month_start),
-                "to_date": str(last_month_end),
+    return success_response(
+        [
+            {
+                "id": "ticket_performance_pdf",
+                "name": "Ticket Performance Report",
+                "format": "PDF",
+                "description": "Summary of ticket KPIs, SLA compliance, and priority breakdown.",
+                "endpoint": "/api/v1/reports/tickets/pdf",
+                "suggested_period": {
+                    "from_date": str(last_month_start),
+                    "to_date": str(last_month_end),
+                },
             },
-        },
-        {
-            "id": "ticket_export_csv",
-            "name": "Ticket Data Export",
-            "format": "CSV",
-            "description": "Raw ticket data export with all fields, suitable for Excel analysis.",
-            "endpoint": "/api/v1/reports/tickets/csv",
-            "suggested_period": {
-                "from_date": str(last_month_start),
-                "to_date": str(last_month_end),
+            {
+                "id": "ticket_export_csv",
+                "name": "Ticket Data Export",
+                "format": "CSV",
+                "description": "Raw ticket data export with all fields, suitable for Excel analysis.",
+                "endpoint": "/api/v1/reports/tickets/csv",
+                "suggested_period": {
+                    "from_date": str(last_month_start),
+                    "to_date": str(last_month_end),
+                },
             },
-        },
-        {
-            "id": "analytics_workbook_excel",
-            "name": "Analytics Workbook",
-            "format": "Excel (.xlsx)",
-            "description": "Multi-sheet workbook with daily trends, SLA compliance, and agent performance.",
-            "endpoint": "/api/v1/reports/analytics/excel",
-            "suggested_period": {
-                "from_date": str(last_month_start),
-                "to_date": str(last_month_end),
+            {
+                "id": "analytics_workbook_excel",
+                "name": "Analytics Workbook",
+                "format": "Excel (.xlsx)",
+                "description": "Multi-sheet workbook with daily trends, SLA compliance, and agent performance.",
+                "endpoint": "/api/v1/reports/analytics/excel",
+                "suggested_period": {
+                    "from_date": str(last_month_start),
+                    "to_date": str(last_month_end),
+                },
             },
-        },
-    ])
+        ]
+    )

@@ -6,7 +6,6 @@ Centralizes all SocketIO emit calls for consistent event naming.
 
 from app.extensions import socketio
 
-
 # ─── Event Name Constants ──────────────────────────────────────────────────────
 EVT_TICKET_CREATED = "ticket:created"
 EVT_TICKET_UPDATED = "ticket:updated"
@@ -40,6 +39,7 @@ def emit_broadcast(event: str, data: dict) -> None:
 
 
 # ─── Convenience Emitters ──────────────────────────────────────────────────────
+
 
 def emit_ticket_assigned(assignee_id: int, ticket_data: dict) -> None:
     """Notify an agent they have been assigned a ticket."""

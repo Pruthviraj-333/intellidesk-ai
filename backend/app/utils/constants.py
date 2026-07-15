@@ -171,6 +171,6 @@ ALLOWED_ATTACHMENT_EXTENSIONS: set = ALLOWED_DOCUMENT_EXTENSIONS | ALLOWED_IMAGE
 
 
 # ─── AI Assistant ─────────────────────────────────────────────────────────────────
-CHAT_HISTORY_LIMIT: int = 10        # Max messages included in LLM context window
-MAX_RAG_RESULTS: int = 5            # Default number of RAG chunks per query
+CHAT_HISTORY_LIMIT: int = 10  # Max messages included in LLM context window
+MAX_RAG_RESULTS: int = 5  # Default number of RAG chunks per query
 MIN_CLASSIFICATION_CONFIDENCE: float = 0.65  # Minimum confidence to auto-apply AI classification

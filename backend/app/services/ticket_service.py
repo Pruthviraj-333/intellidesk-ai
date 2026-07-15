@@ -6,15 +6,22 @@ Business logic for the complete ticket lifecycle.
 from typing import Optional
 
 from app.models.ticket import Ticket
-from app.repositories.ticket_repository import TicketRepository, CommentRepository
 from app.repositories.incident_repository import NotificationRepository
+from app.repositories.ticket_repository import CommentRepository, TicketRepository
 from app.services.audit_service import AuditService
 from app.utils.constants import (
-    TicketStatus, TicketPriority, UserRole,
-    VALID_TICKET_TRANSITIONS, AuditAction, NotificationType,
+    VALID_TICKET_TRANSITIONS,
+    AuditAction,
+    NotificationType,
+    TicketPriority,
+    TicketStatus,
+    UserRole,
 )
 from app.utils.exceptions import (
-    NotFoundError, AuthorizationError, BusinessLogicError, ValidationError,
+    AuthorizationError,
+    BusinessLogicError,
+    NotFoundError,
+    ValidationError,
 )
 from app.utils.logger import get_logger
 
@@ -94,7 +101,10 @@ class TicketService:
         if role == UserRole.AGENT.value and ticket.assignee_id != current_user_id:
             raise AuthorizationError("Agents can only update tickets assigned to them.")
         if role == UserRole.MANAGER.value:
-            if ticket.department_id is not None and ticket.department_id != current_user_department_id:
+            if (
+                ticket.department_id is not None
+                and ticket.department_id != current_user_department_id
+            ):
                 raise AuthorizationError("Managers can only update tickets in their department.")
 
         # Validate status transition
@@ -117,9 +127,7 @@ class TicketService:
             if new_status == TicketStatus.RESOLVED.value:
                 resolution_notes = data.get("resolution_notes") or ticket.resolution_notes
                 if not resolution_notes:
-                    raise ValidationError(
-                        "Resolution notes are required when resolving a ticket."
-                    )
+                    raise ValidationError("Resolution notes are required when resolving a ticket.")
 
         old_values = {k: getattr(ticket, k) for k in data if hasattr(ticket, k)}
         updated_ticket = TicketRepository.update(ticket, data)
@@ -159,11 +167,10 @@ class TicketService:
         if not ticket:
             raise NotFoundError("Ticket", ticket_id)
 
-        if (
-            current_user_role == UserRole.EMPLOYEE.value
-            and ticket.requester_id != current_user_id
-        ):
-            raise NotFoundError("Ticket", ticket_id)  # Not Found (not Forbidden) to prevent enumeration
+        if current_user_role == UserRole.EMPLOYEE.value and ticket.requester_id != current_user_id:
+            raise NotFoundError(
+                "Ticket", ticket_id
+            )  # Not Found (not Forbidden) to prevent enumeration
 
         return ticket
 

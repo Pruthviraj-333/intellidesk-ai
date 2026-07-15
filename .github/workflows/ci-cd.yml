@@ -276,7 +276,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
@@ -353,16 +353,10 @@ jobs:
           flask db upgrade
           flask seed-db
 
-      - name: Start backend server in background
-        working-directory: backend
-        run: |
-          FLASK_APP=wsgi.py flask run --port=8000 &
-          sleep 3
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
@@ -376,7 +370,12 @@ jobs:
 
       - name: Run Playwright E2E tests
         working-directory: frontend
-        run: npm run test:e2e
+        run: |
+          cd ../backend
+          FLASK_APP=wsgi.py flask run --port=8000 &
+          cd ../frontend
+          sleep 5
+          npm run test:e2e
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4

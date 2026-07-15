@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 import bcrypt
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
-from app.utils.constants import UserRole, UserStatus, TokenType
+from app.models.base import SoftDeleteMixin, TimestampMixin
+from app.utils.constants import TokenType, UserRole, UserStatus
 
 
 class Role(db.Model, TimestampMixin):
@@ -83,7 +83,9 @@ class User(db.Model, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     role = db.relationship("Role", back_populates="users")
-    department = db.relationship("Department", back_populates="members", foreign_keys=[department_id])
+    department = db.relationship(
+        "Department", back_populates="members", foreign_keys=[department_id]
+    )
     tokens = db.relationship("UserToken", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
@@ -93,9 +95,7 @@ class User(db.Model, TimestampMixin, SoftDeleteMixin):
     def set_password(self, plain_password: str) -> None:
         """Hash and store password using bcrypt with cost factor 12."""
         salt = bcrypt.gensalt(rounds=12)
-        self.password_hash = bcrypt.hashpw(
-            plain_password.encode("utf-8"), salt
-        ).decode("utf-8")
+        self.password_hash = bcrypt.hashpw(plain_password.encode("utf-8"), salt).decode("utf-8")
 
     def check_password(self, plain_password: str) -> bool:
         """Verify a plain password against the stored hash."""

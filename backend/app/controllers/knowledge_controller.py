@@ -7,32 +7,48 @@ Route prefix: /api/v1/knowledge
 from flask import Blueprint
 from flask_jwt_extended import jwt_required
 
-from app.repositories.knowledge_repository import (
-    ArticleRepository, ArticleCategoryRepository, ArticleTagRepository,
-)
-from app.services.rag_service import RAGService
-from app.services.audit_service import AuditService
 from app.dtos.knowledge_dto import (
-    ArticleSummarySchema, ArticleDetailSchema,
-    CreateArticleSchema, UpdateArticleSchema, ArticleListQuerySchema,
-    VoteArticleSchema, SearchQuerySchema, SearchResultSchema,
-    ArticleCategorySchema, CreateCategorySchema, ArticleTagSchema,
+    ArticleCategorySchema,
+    ArticleDetailSchema,
+    ArticleListQuerySchema,
+    ArticleSummarySchema,
+    ArticleTagSchema,
+    CreateArticleSchema,
+    CreateCategorySchema,
+    SearchQuerySchema,
+    SearchResultSchema,
+    UpdateArticleSchema,
+    VoteArticleSchema,
 )
-from app.utils.decorators import (
-    validate_body, validate_query, role_required,
-    get_current_user_id, get_current_user_role,
+from app.repositories.knowledge_repository import (
+    ArticleCategoryRepository,
+    ArticleRepository,
+    ArticleTagRepository,
 )
-from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
-)
+from app.services.audit_service import AuditService
+from app.services.rag_service import RAGService
 from app.utils.constants import UserRole
-from app.utils.exceptions import NotFoundError, AuthorizationError, BusinessLogicError
+from app.utils.decorators import (
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_body,
+    validate_query,
+)
+from app.utils.exceptions import AuthorizationError, BusinessLogicError, NotFoundError
+from app.utils.response import (
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 knowledge_bp = Blueprint("knowledge", __name__, url_prefix="/api/v1/knowledge")
 
 
 # ─── Article CRUD ─────────────────────────────────────────────────────────────
+
 
 @knowledge_bp.route("/articles", methods=["POST"])
 @role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -69,11 +85,25 @@ def list_articles(params: dict):
         params["status"] = "published"
     params["user_role"] = role
 
-    pagination = ArticleRepository.list_with_filters(**{
-        k: v for k, v in params.items()
-        if k in ("status", "category_id", "tag", "author_id", "search",
-                  "sort_by", "order", "page", "per_page", "user_role")
-    })
+    pagination = ArticleRepository.list_with_filters(
+        **{
+            k: v
+            for k, v in params.items()
+            if k
+            in (
+                "status",
+                "category_id",
+                "tag",
+                "author_id",
+                "search",
+                "sort_by",
+                "order",
+                "page",
+                "per_page",
+                "user_role",
+            )
+        }
+    )
     return paginated_response(
         data=ArticleSummarySchema(many=True).dump(pagination.items),
         pagination=build_pagination_meta(pagination),
@@ -165,14 +195,17 @@ def publish_article(article_id: int):
 
     # Index in ChromaDB
     success = RAGService.index_article(article)
-    return success_response({
-        "message": "Article published successfully.",
-        "indexed": success,
-        "article": ArticleDetailSchema().dump(article),
-    })
+    return success_response(
+        {
+            "message": "Article published successfully.",
+            "indexed": success,
+            "article": ArticleDetailSchema().dump(article),
+        }
+    )
 
 
 # ─── Voting ───────────────────────────────────────────────────────────────────
+
 
 @knowledge_bp.route("/articles/<int:article_id>/vote", methods=["POST"])
 @jwt_required()
@@ -191,14 +224,17 @@ def vote_article(data: dict, article_id: int):
         user_id=user_id,
         is_helpful=data["is_helpful"],
     )
-    return success_response({
-        "message": "Vote recorded.",
-        "votes": result,
-        "helpfulness_score": article.helpfulness_score,
-    })
+    return success_response(
+        {
+            "message": "Vote recorded.",
+            "votes": result,
+            "helpfulness_score": article.helpfulness_score,
+        }
+    )
 
 
 # ─── Semantic Search ──────────────────────────────────────────────────────────
+
 
 @knowledge_bp.route("/search", methods=["GET"])
 @jwt_required()
@@ -219,14 +255,17 @@ def semantic_search(params: dict):
         n_results=n_results,
         collections=collections,
     )
-    return success_response({
-        "query": query,
-        "results": results,
-        "result_count": len(results),
-    })
+    return success_response(
+        {
+            "query": query,
+            "results": results,
+            "result_count": len(results),
+        }
+    )
 
 
 # ─── Categories ───────────────────────────────────────────────────────────────
+
 
 @knowledge_bp.route("/categories", methods=["GET"])
 @jwt_required()
@@ -246,6 +285,7 @@ def create_category(data: dict):
 
 
 # ─── Tags ─────────────────────────────────────────────────────────────────────
+
 
 @knowledge_bp.route("/tags", methods=["GET"])
 @jwt_required()

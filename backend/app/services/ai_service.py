@@ -8,11 +8,11 @@ import uuid
 from typing import Optional
 
 from app.extensions import db
-from app.models.ai import AISession, AIMessage, AIClassification
-from app.services.rag_service import RAGService
+from app.models.ai import AIClassification, AIMessage, AISession
 from app.services.llm_service import LLMService
+from app.services.rag_service import RAGService
 from app.utils.constants import CHAT_HISTORY_LIMIT
-from app.utils.exceptions import NotFoundError, BusinessLogicError
+from app.utils.exceptions import BusinessLogicError, NotFoundError
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -111,10 +111,12 @@ class AIChatService:
         ]
 
         if context:
-            messages.append({
-                "role": "system",
-                "content": f"Use the following knowledge base context to answer the user's question:\n\n{context}",
-            })
+            messages.append(
+                {
+                    "role": "system",
+                    "content": f"Use the following knowledge base context to answer the user's question:\n\n{context}",
+                }
+            )
 
         messages.extend(history)
         messages.append({"role": "user", "content": query})
@@ -191,17 +193,13 @@ class AIChatService:
         """
         limit = CHAT_HISTORY_LIMIT  # e.g. last 10 messages
         recent_messages = (
-            AIMessage.query
-            .filter_by(session_id=session.id)
+            AIMessage.query.filter_by(session_id=session.id)
             .order_by(AIMessage.created_at.desc())
             .limit(limit)
             .all()
         )
         # Return in chronological order
-        return [
-            {"role": msg.role, "content": msg.content}
-            for msg in reversed(recent_messages)
-        ]
+        return [{"role": msg.role, "content": msg.content} for msg in reversed(recent_messages)]
 
     @staticmethod
     def get_session_history(session_uuid: str, user_id: int) -> list[AIMessage]:
@@ -219,8 +217,7 @@ class AIChatService:
     def list_user_sessions(user_id: int, page: int = 1, per_page: int = 20):
         """List all active sessions for a user."""
         return (
-            AISession.query
-            .filter_by(user_id=user_id, deleted_at=None)
+            AISession.query.filter_by(user_id=user_id, deleted_at=None)
             .order_by(AISession.updated_at.desc())
             .paginate(page=page, per_page=per_page, error_out=False)
         )
@@ -260,6 +257,7 @@ class AITicketClassifier:
             dept_id = None
             if classification.get("department_name"):
                 from app.models.department import Department
+
                 dept = Department.query.filter(
                     Department.name.ilike(f"%{classification['department_name']}%"),
                     Department.deleted_at.is_(None),
@@ -284,6 +282,7 @@ class AITicketClassifier:
 
             # Update ticket's AI suggestion fields
             from app.repositories.ticket_repository import TicketRepository
+
             TicketRepository.update_ai_metadata(
                 ticket=ticket,
                 category=classification.get("category"),

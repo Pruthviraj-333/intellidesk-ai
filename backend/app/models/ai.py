@@ -6,7 +6,7 @@ Stores AI assistant sessions, messages, and ticket classification results.
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin
 
 
 class AISession(db.Model, TimestampMixin, SoftDeleteMixin):
@@ -32,7 +32,8 @@ class AISession(db.Model, TimestampMixin, SoftDeleteMixin):
     user = db.relationship("User", foreign_keys=[user_id], backref="ai_sessions")
     ticket = db.relationship("Ticket", foreign_keys=[ticket_id], backref="ai_sessions")
     messages = db.relationship(
-        "AIMessage", back_populates="session",
+        "AIMessage",
+        back_populates="session",
         cascade="all, delete-orphan",
         order_by="AIMessage.created_at",
     )
@@ -51,8 +52,10 @@ class AIMessage(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     session_id = db.Column(
-        db.Integer, db.ForeignKey("ai_sessions.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        db.Integer,
+        db.ForeignKey("ai_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     role = db.Column(db.String(20), nullable=False)  # user | assistant | system
     content = db.Column(db.Text, nullable=False)
@@ -86,8 +89,10 @@ class AIClassification(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(
-        db.Integer, db.ForeignKey("tickets.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        db.Integer,
+        db.ForeignKey("tickets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Predictions
@@ -98,7 +103,7 @@ class AIClassification(db.Model):
     reasoning = db.Column(db.Text, nullable=True)
 
     # Human feedback for model monitoring
-    was_accepted = db.Column(db.Boolean, nullable=True)   # None = not reviewed yet
+    was_accepted = db.Column(db.Boolean, nullable=True)  # None = not reviewed yet
     feedback_at = db.Column(db.DateTime(timezone=True), nullable=True)
     feedback_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 

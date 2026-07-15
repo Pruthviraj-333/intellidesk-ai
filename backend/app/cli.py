@@ -29,7 +29,7 @@ def register_commands(app: Flask) -> None:
     def create_admin(email, password, first_name, last_name):
         """Create a Super Admin user interactively."""
         from app.extensions import db
-        from app.models.user import User, Role
+        from app.models.user import Role, User
         from app.utils.constants import UserRole, UserStatus
 
         role = Role.query.filter_by(name=UserRole.SUPER_ADMIN.value).first()
@@ -59,6 +59,7 @@ def register_commands(app: Flask) -> None:
     def drop_db():
         """Drop all database tables (development only)."""
         from app.extensions import db
+
         db.drop_all()
         click.echo("⚠️  All tables dropped.")
 
@@ -126,8 +127,9 @@ def _seed_departments():
 def _seed_admin_user():
     """Create the default Super Admin user."""
     from datetime import datetime, timezone
+
     from app.extensions import db
-    from app.models.user import User, Role
+    from app.models.user import Role, User
     from app.utils.constants import UserRole, UserStatus
 
     email = "admin@intellidesk.ai"
@@ -152,18 +154,37 @@ def _seed_admin_user():
 def _seed_demo_users():
     """Create demo users for each role."""
     from datetime import datetime, timezone
+
     from app.extensions import db
-    from app.models.user import User, Role
     from app.models.department import Department
+    from app.models.user import Role, User
     from app.utils.constants import UserStatus
 
     demo_users = [
-        {"email": "manager@intellidesk.ai", "first_name": "Alice", "last_name": "Manager",
-         "role": "manager", "password": "Manager@123!", "dept": "IT Support"},
-        {"email": "agent@intellidesk.ai", "first_name": "Bob", "last_name": "Agent",
-         "role": "agent", "password": "Agent@123!", "dept": "IT Support"},
-        {"email": "employee@intellidesk.ai", "first_name": "Charlie", "last_name": "Employee",
-         "role": "employee", "password": "Employee@123!", "dept": None},
+        {
+            "email": "manager@intellidesk.ai",
+            "first_name": "Alice",
+            "last_name": "Manager",
+            "role": "manager",
+            "password": "Manager@123!",
+            "dept": "IT Support",
+        },
+        {
+            "email": "agent@intellidesk.ai",
+            "first_name": "Bob",
+            "last_name": "Agent",
+            "role": "agent",
+            "password": "Agent@123!",
+            "dept": "IT Support",
+        },
+        {
+            "email": "employee@intellidesk.ai",
+            "first_name": "Charlie",
+            "last_name": "Employee",
+            "role": "employee",
+            "password": "Employee@123!",
+            "dept": None,
+        },
     ]
 
     for u_data in demo_users:
@@ -199,12 +220,27 @@ def _seed_settings():
     defaults = [
         ("org_name", "IntelliDesk AI Demo", "string", "Organization display name"),
         ("timezone", "UTC", "string", "Default platform timezone"),
-        ("sla_critical_response_minutes", "15", "int", "SLA response time for Critical tickets (minutes)"),
-        ("sla_critical_resolution_hours", "4", "int", "SLA resolution time for Critical tickets (hours)"),
+        (
+            "sla_critical_response_minutes",
+            "15",
+            "int",
+            "SLA response time for Critical tickets (minutes)",
+        ),
+        (
+            "sla_critical_resolution_hours",
+            "4",
+            "int",
+            "SLA resolution time for Critical tickets (hours)",
+        ),
         ("sla_high_response_hours", "1", "int", "SLA response time for High tickets (hours)"),
         ("sla_high_resolution_hours", "8", "int", "SLA resolution time for High tickets (hours)"),
         ("sla_medium_response_hours", "4", "int", "SLA response time for Medium tickets (hours)"),
-        ("sla_medium_resolution_hours", "24", "int", "SLA resolution time for Medium tickets (hours)"),
+        (
+            "sla_medium_resolution_hours",
+            "24",
+            "int",
+            "SLA resolution time for Medium tickets (hours)",
+        ),
         ("sla_low_response_hours", "8", "int", "SLA response time for Low tickets (hours)"),
         ("sla_low_resolution_hours", "72", "int", "SLA resolution time for Low tickets (hours)"),
         ("ai_model", "llama-3.3-70b-versatile", "string", "Active Groq model name"),

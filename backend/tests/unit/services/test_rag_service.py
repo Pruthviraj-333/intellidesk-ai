@@ -3,8 +3,9 @@ IntelliDesk AI — RAG Service Unit Tests
 Tests for chunking, embedding, and ChromaDB operations with mocked dependencies.
 """
 
+from unittest.mock import MagicMock, call, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, call
 
 
 class TestChunkText:
@@ -13,11 +14,13 @@ class TestChunkText:
     def test_empty_text_returns_empty_list(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             assert RAGService.chunk_text("") == []
 
     def test_short_text_returns_single_chunk(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             text = "This is a short article. " * 10
             chunks = RAGService.chunk_text(text, chunk_size=500)
             assert len(chunks) == 1
@@ -25,6 +28,7 @@ class TestChunkText:
     def test_long_text_is_split_into_multiple_chunks(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             # 1500 words → 3 chunks of 500 words
             text = "word " * 1500
             chunks = RAGService.chunk_text(text, chunk_size=500, overlap=0)
@@ -33,6 +37,7 @@ class TestChunkText:
     def test_overlap_produces_more_chunks_than_without(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             text = "word " * 1200
             no_overlap = RAGService.chunk_text(text, chunk_size=500, overlap=0)
             with_overlap = RAGService.chunk_text(text, chunk_size=500, overlap=100)
@@ -41,6 +46,7 @@ class TestChunkText:
     def test_trivially_short_chunks_are_filtered(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             text = "hi " * 5  # Too short to meet 50-char minimum
             chunks = RAGService.chunk_text(text, chunk_size=10)
             assert all(len(c.strip()) > 50 for c in chunks) or len(chunks) == 0
@@ -48,6 +54,7 @@ class TestChunkText:
     def test_chunk_size_respected(self, app):
         with app.app_context():
             from app.services.rag_service import RAGService
+
             text = "word " * 600
             chunks = RAGService.chunk_text(text, chunk_size=100, overlap=0)
             for chunk in chunks:
@@ -85,8 +92,10 @@ class TestIndexArticle:
 
             article = self._make_article()
 
-            with patch("app.services.rag_service.get_chroma_client", return_value=mock_client), \
-                 patch("app.services.rag_service.get_embedding_model", return_value=mock_model):
+            with (
+                patch("app.services.rag_service.get_chroma_client", return_value=mock_client),
+                patch("app.services.rag_service.get_embedding_model", return_value=mock_model),
+            ):
 
                 result = RAGService.index_article(article)
                 assert result is True
@@ -106,8 +115,10 @@ class TestIndexArticle:
             mock_model = MagicMock()
             mock_client = MagicMock()
 
-            with patch("app.services.rag_service.get_chroma_client", return_value=mock_client), \
-                 patch("app.services.rag_service.get_embedding_model", return_value=mock_model):
+            with (
+                patch("app.services.rag_service.get_chroma_client", return_value=mock_client),
+                patch("app.services.rag_service.get_embedding_model", return_value=mock_model),
+            ):
 
                 result = RAGService.index_article(article)
                 assert result is False
@@ -120,8 +131,10 @@ class TestIndexArticle:
             mock_model = MagicMock()
             mock_model.encode.side_effect = Exception("ChromaDB connection refused")
 
-            with patch("app.services.rag_service.get_chroma_client"), \
-                 patch("app.services.rag_service.get_embedding_model", return_value=mock_model):
+            with (
+                patch("app.services.rag_service.get_chroma_client"),
+                patch("app.services.rag_service.get_embedding_model", return_value=mock_model),
+            ):
 
                 result = RAGService.index_article(article)
                 assert result is False
@@ -141,18 +154,22 @@ class TestSemanticSearch:
             mock_collection = MagicMock()
             mock_collection.query.return_value = {
                 "documents": [["Article about VPN setup", "Article about network issues"]],
-                "metadatas": [[
-                    {"article_id": "1", "title": "VPN Setup Guide", "source": "article"},
-                    {"article_id": "2", "title": "Network Guide", "source": "article"},
-                ]],
+                "metadatas": [
+                    [
+                        {"article_id": "1", "title": "VPN Setup Guide", "source": "article"},
+                        {"article_id": "2", "title": "Network Guide", "source": "article"},
+                    ]
+                ],
                 "distances": [[0.15, 0.35]],  # Lower = more similar
             }
 
             mock_client = MagicMock()
             mock_client.get_collection.return_value = mock_collection
 
-            with patch("app.services.rag_service.get_chroma_client", return_value=mock_client), \
-                 patch("app.services.rag_service.get_embedding_model", return_value=mock_model):
+            with (
+                patch("app.services.rag_service.get_chroma_client", return_value=mock_client),
+                patch("app.services.rag_service.get_embedding_model", return_value=mock_model),
+            ):
 
                 results = RAGService.semantic_search("VPN configuration issue", n_results=2)
                 assert len(results) <= 2
@@ -170,8 +187,10 @@ class TestSemanticSearch:
             mock_client = MagicMock()
             mock_client.get_collection.side_effect = Exception("Collection not found")
 
-            with patch("app.services.rag_service.get_chroma_client", return_value=mock_client), \
-                 patch("app.services.rag_service.get_embedding_model", return_value=mock_model):
+            with (
+                patch("app.services.rag_service.get_chroma_client", return_value=mock_client),
+                patch("app.services.rag_service.get_embedding_model", return_value=mock_model),
+            ):
 
                 results = RAGService.semantic_search("some query", n_results=5)
                 assert results == []  # Gracefully returns empty on missing collections

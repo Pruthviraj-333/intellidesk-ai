@@ -6,7 +6,7 @@ Uploaded knowledge documents for RAG pipeline processing.
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin
 from app.utils.constants import DocumentStatus
 
 
@@ -50,7 +50,9 @@ class Document(db.Model, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     uploader = db.relationship("User", foreign_keys=[uploaded_by], backref="uploaded_documents")
-    chunks = db.relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    chunks = db.relationship(
+        "DocumentChunk", back_populates="document", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Document '{self.file_name}' [{self.status}]>"

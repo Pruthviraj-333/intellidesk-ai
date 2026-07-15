@@ -7,8 +7,12 @@ from typing import Optional
 
 from app.extensions import db
 from app.models.incident import (
-    Incident, IncidentTimeline, Problem, Notification,
-    incident_tickets, problem_incidents,
+    Incident,
+    IncidentTimeline,
+    Notification,
+    Problem,
+    incident_tickets,
+    problem_incidents,
 )
 from app.utils.helpers import generate_incident_number, generate_problem_number
 
@@ -55,6 +59,7 @@ class IncidentRepository:
 
         if linked_ticket_ids:
             from app.models.ticket import Ticket
+
             tickets = Ticket.query.filter(Ticket.id.in_(linked_ticket_ids)).all()
             incident.linked_tickets.extend(tickets)
 
@@ -64,10 +69,18 @@ class IncidentRepository:
     @staticmethod
     def update(incident: Incident, data: dict) -> Incident:
         from datetime import datetime, timezone
+
         allowed = {
-            "title", "description", "severity", "status", "impact",
-            "affected_services", "assignee_id", "department_id",
-            "problem_id", "resolution_notes",
+            "title",
+            "description",
+            "severity",
+            "status",
+            "impact",
+            "affected_services",
+            "assignee_id",
+            "department_id",
+            "problem_id",
+            "resolution_notes",
         }
         for key, value in data.items():
             if key in allowed:
@@ -163,8 +176,15 @@ class ProblemRepository:
 
     @staticmethod
     def update(problem: Problem, data: dict) -> Problem:
-        allowed = {"title", "description", "status", "root_cause",
-                   "workaround", "resolution", "owner_id"}
+        allowed = {
+            "title",
+            "description",
+            "status",
+            "root_cause",
+            "workaround",
+            "resolution",
+            "owner_id",
+        }
         for key, value in data.items():
             if key in allowed:
                 setattr(problem, key, value)
@@ -218,7 +238,9 @@ class NotificationRepository:
         page: int = 1,
         per_page: int = 20,
     ):
-        query = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc())
+        query = Notification.query.filter_by(user_id=user_id).order_by(
+            Notification.created_at.desc()
+        )
         if is_read is not None:
             query = query.filter(Notification.is_read == is_read)
         return query.paginate(page=page, per_page=per_page, error_out=False)
@@ -230,6 +252,7 @@ class NotificationRepository:
     @staticmethod
     def mark_all_read(user_id: int) -> int:
         from datetime import datetime, timezone
+
         count = Notification.query.filter_by(user_id=user_id, is_read=False).update(
             {"is_read": True, "read_at": datetime.now(timezone.utc)},
             synchronize_session="fetch",

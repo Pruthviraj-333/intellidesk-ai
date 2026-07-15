@@ -6,15 +6,20 @@ Route prefix: /api/v1/analytics
 
 from flask import Blueprint
 
-from app.services.analytics_service import AnalyticsService
 from app.dtos.analytics_dto import (
-    TrendQuerySchema, LeaderboardQuerySchema, HeatmapQuerySchema,
-    DailyTrendPointSchema, AgentLeaderboardItemSchema,
-    HeatmapPointSchema, TicketVolumeItemSchema, PlatformSummarySchema,
+    AgentLeaderboardItemSchema,
+    DailyTrendPointSchema,
+    HeatmapPointSchema,
+    HeatmapQuerySchema,
+    LeaderboardQuerySchema,
+    PlatformSummarySchema,
+    TicketVolumeItemSchema,
+    TrendQuerySchema,
 )
-from app.utils.decorators import validate_query, role_required, jwt_required_any
-from app.utils.response import success_response
+from app.services.analytics_service import AnalyticsService
 from app.utils.constants import UserRole
+from app.utils.decorators import jwt_required_any, role_required, validate_query
+from app.utils.response import success_response
 
 analytics_bp = Blueprint("analytics", __name__, url_prefix="/api/v1/analytics")
 
@@ -44,11 +49,13 @@ def get_trends(params: dict):
         days=params["days"],
         department_id=params.get("department_id"),
     )
-    return success_response({
-        "period_days": params["days"],
-        "data_points": len(trends),
-        "trends": DailyTrendPointSchema(many=True).dump(trends),
-    })
+    return success_response(
+        {
+            "period_days": params["days"],
+            "data_points": len(trends),
+            "trends": DailyTrendPointSchema(many=True).dump(trends),
+        }
+    )
 
 
 @analytics_bp.route("/sla-compliance", methods=["GET"])
@@ -87,10 +94,12 @@ def get_agent_leaderboard(params: dict):
         days=params["days"],
         limit=params["limit"],
     )
-    return success_response({
-        "period_days": params["days"],
-        "agents": AgentLeaderboardItemSchema(many=True).dump(leaderboard),
-    })
+    return success_response(
+        {
+            "period_days": params["days"],
+            "agents": AgentLeaderboardItemSchema(many=True).dump(leaderboard),
+        }
+    )
 
 
 @analytics_bp.route("/heatmap", methods=["GET"])
@@ -103,7 +112,9 @@ def get_heatmap(params: dict):
     Used to render the calendar heatmap showing peak support hours.
     """
     heatmap = AnalyticsService.get_heatmap_data(days=params["days"])
-    return success_response({
-        "period_days": params["days"],
-        "heatmap": HeatmapPointSchema(many=True).dump(heatmap),
-    })
+    return success_response(
+        {
+            "period_days": params["days"],
+            "heatmap": HeatmapPointSchema(many=True).dump(heatmap),
+        }
+    )

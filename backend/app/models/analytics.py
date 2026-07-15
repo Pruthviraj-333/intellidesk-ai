@@ -3,7 +3,7 @@ IntelliDesk AI — Analytics & Metrics Models
 Pre-aggregated daily snapshots for fast dashboard and reporting queries.
 """
 
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
 
 from app.extensions import db
 
@@ -85,9 +85,7 @@ class AgentDailyMetric(db.Model):
     avg_resolution_time_hours = db.Column(db.Float, nullable=True)
     first_response_time_minutes = db.Column(db.Float, nullable=True)
 
-    __table_args__ = (
-        db.UniqueConstraint("metric_date", "agent_id", name="uq_agent_daily_metric"),
-    )
+    __table_args__ = (db.UniqueConstraint("metric_date", "agent_id", name="uq_agent_daily_metric"),)
 
     agent = db.relationship("User", foreign_keys=[agent_id], backref="daily_metrics")
 

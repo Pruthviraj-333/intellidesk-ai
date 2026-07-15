@@ -3,7 +3,7 @@ IntelliDesk AI — Maintenance Celery Tasks
 Scheduled jobs: token cleanup, daily metric snapshots, SLA monitoring.
 """
 
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 
 from app.tasks import celery_app
 from app.utils.logger import get_logger
@@ -37,8 +37,8 @@ def compute_daily_metrics_snapshot():
     Runs every night at 00:05 UTC via Celery Beat to capture complete day data.
     Also computes per-agent daily metrics.
     """
-    from app.services.analytics_service import AnalyticsService
     from app.models.department import Department
+    from app.services.analytics_service import AnalyticsService
 
     yesterday = date.today() - timedelta(days=1)
 
@@ -69,9 +69,9 @@ def check_sla_breaches():
     Sends in-app + email notifications for tickets approaching or breaching SLA.
     """
     from app.extensions import db
-    from app.models.ticket import Ticket
     from app.models.incident import Notification
-    from app.utils.constants import TicketStatus, NotificationType
+    from app.models.ticket import Ticket
+    from app.utils.constants import NotificationType, TicketStatus
 
     now = datetime.now(timezone.utc)
     warning_threshold = now + timedelta(minutes=30)  # Warn 30 min before breach
@@ -121,4 +121,3 @@ def check_sla_breaches():
 
     db.session.commit()
     logger.info(f"SLA breaches marked and notified: {len(breached)} tickets.")
-

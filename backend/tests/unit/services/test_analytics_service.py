@@ -3,9 +3,10 @@ IntelliDesk AI — Analytics Service Unit Tests
 Tests for snapshot computation, aggregation, and helper methods.
 """
 
-import pytest
 from datetime import date, timedelta
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 
 class TestChunkTextService:
@@ -14,6 +15,7 @@ class TestChunkTextService:
     def test_analytics_service_importable(self, app):
         with app.app_context():
             from app.services.analytics_service import AnalyticsService
+
             assert AnalyticsService is not None
 
 
@@ -26,8 +28,12 @@ class TestGetPlatformSummary:
 
             summary = AnalyticsService.get_platform_summary()
             expected_keys = {
-                "total_tickets", "open_tickets", "total_incidents",
-                "total_articles", "total_agents", "ai_sessions_total",
+                "total_tickets",
+                "open_tickets",
+                "total_incidents",
+                "total_articles",
+                "total_agents",
+                "ai_sessions_total",
                 "overall_sla_compliance",
             }
             assert expected_keys.issubset(summary.keys())
@@ -60,7 +66,9 @@ class TestSLAComplianceByPriority:
 
             result = AnalyticsService.get_sla_compliance_by_priority()
             for priority in TicketPriority:
-                assert priority.value in result, f"Priority '{priority.value}' missing from SLA result"
+                assert (
+                    priority.value in result
+                ), f"Priority '{priority.value}' missing from SLA result"
 
     def test_compliance_structure_correct(self, app):
         with app.app_context():
@@ -77,8 +85,8 @@ class TestSLAComplianceByPriority:
 
     def test_no_tickets_gives_100_percent(self, app):
         with app.app_context():
-            from app.services.analytics_service import AnalyticsService
             from app.models.ticket import Ticket
+            from app.services.analytics_service import AnalyticsService
 
             # On fresh test DB with no tickets, compliance should be 100%
             with patch.object(Ticket, "query") as mock_query:
@@ -105,15 +113,17 @@ class TestTicketVolumeByCategory:
     def test_uncategorized_label_used_for_null(self, app):
         """Tickets with NULL category should be labelled 'Uncategorized'."""
         with app.app_context():
-            from app.services.analytics_service import AnalyticsService
             from app.extensions import db
+            from app.services.analytics_service import AnalyticsService
 
             row_mock = MagicMock()
             row_mock.category = None
             row_mock.count = 5
 
             with patch.object(db.session, "query") as mock_query:
-                mock_query.return_value.filter.return_value.group_by.return_value.order_by.return_value.all.return_value = [row_mock]
+                mock_query.return_value.filter.return_value.group_by.return_value.order_by.return_value.all.return_value = [
+                    row_mock
+                ]
                 result = AnalyticsService.get_ticket_volume_by_category()
 
             for item in result:
@@ -181,8 +191,8 @@ class TestComputeDailySnapshot:
     def test_snapshot_is_idempotent(self, app):
         """Running snapshot twice for same date should not create duplicates."""
         with app.app_context():
-            from app.services.analytics_service import AnalyticsService
             from app.models.analytics import DailyMetricSnapshot
+            from app.services.analytics_service import AnalyticsService
 
             yesterday = date.today() - timedelta(days=1)
 
@@ -217,12 +227,11 @@ class TestOverallSLAComputation:
 
     def test_returns_100_when_no_resolved_tickets(self, app):
         with app.app_context():
-            from app.services.analytics_service import AnalyticsService
             from app.models.ticket import Ticket
+            from app.services.analytics_service import AnalyticsService
 
             with patch.object(
-                Ticket.query.filter(Ticket.resolved_at.isnot(None),
-                                    Ticket.deleted_at.is_(None)),
+                Ticket.query.filter(Ticket.resolved_at.isnot(None), Ticket.deleted_at.is_(None)),
                 "count",
                 return_value=0,
             ):

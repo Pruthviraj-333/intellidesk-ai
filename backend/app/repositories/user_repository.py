@@ -12,8 +12,8 @@ from typing import Optional
 from sqlalchemy import or_
 
 from app.extensions import db
-from app.models.user import User, Role, UserToken
-from app.utils.constants import UserStatus, UserRole, TokenType
+from app.models.user import Role, User, UserToken
+from app.utils.constants import TokenType, UserRole, UserStatus
 
 
 class UserRepository:
@@ -63,9 +63,15 @@ class UserRepository:
     def update(user: User, data: dict) -> User:
         """Update allowed user fields."""
         allowed_fields = {
-            "first_name", "last_name", "phone", "avatar_url",
-            "timezone", "notification_prefs", "role_id",
-            "department_id", "status",
+            "first_name",
+            "last_name",
+            "phone",
+            "avatar_url",
+            "timezone",
+            "notification_prefs",
+            "role_id",
+            "department_id",
+            "status",
         }
         for key, value in data.items():
             if key in allowed_fields:
@@ -153,9 +159,7 @@ class UserTokenRepository:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         # Invalidate any existing tokens of the same type for this user
-        UserToken.query.filter_by(
-            user_id=user_id, token_type=token_type, used_at=None
-        ).delete()
+        UserToken.query.filter_by(user_id=user_id, token_type=token_type, used_at=None).delete()
 
         token = UserToken(
             user_id=user_id,

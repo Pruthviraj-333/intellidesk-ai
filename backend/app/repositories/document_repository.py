@@ -103,9 +103,12 @@ class DocumentRepository:
     @staticmethod
     def get_pending_documents(limit: int = 10) -> list[Document]:
         """Get documents awaiting processing (for Celery pickup)."""
-        return Document.query.filter_by(
-            status=DocumentStatus.PENDING.value, deleted_at=None
-        ).order_by(Document.created_at.asc()).limit(limit).all()
+        return (
+            Document.query.filter_by(status=DocumentStatus.PENDING.value, deleted_at=None)
+            .order_by(Document.created_at.asc())
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def soft_delete(doc: Document) -> None:

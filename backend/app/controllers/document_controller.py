@@ -7,22 +7,28 @@ Route prefix: /api/v1/documents
 from flask import Blueprint, request, send_from_directory
 from flask_jwt_extended import jwt_required
 
+from app.dtos.knowledge_dto import (
+    DocumentListQuerySchema,
+    DocumentResponseSchema,
+)
 from app.repositories.document_repository import DocumentRepository
 from app.services.document_service import DocumentService
-from app.dtos.knowledge_dto import (
-    DocumentResponseSchema, DocumentListQuerySchema,
-)
-from app.utils.decorators import (
-    validate_query, role_required,
-    get_current_user_id, get_current_user_role,
-)
-from app.utils.response import (
-    success_response, created_response, no_content_response,
-    paginated_response, build_pagination_meta,
-)
 from app.utils.constants import UserRole
-from app.utils.exceptions import NotFoundError, ValidationError, AuthorizationError
+from app.utils.decorators import (
+    get_current_user_id,
+    get_current_user_role,
+    role_required,
+    validate_query,
+)
+from app.utils.exceptions import AuthorizationError, NotFoundError, ValidationError
 from app.utils.helpers import get_file_extension, sanitize_filename
+from app.utils.response import (
+    build_pagination_meta,
+    created_response,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 document_bp = Blueprint("documents", __name__, url_prefix="/api/v1/documents")
 
@@ -121,6 +127,7 @@ def reprocess_document(doc_id: int):
         )
 
     from app.tasks.document_tasks import process_document_task
+
     process_document_task.delay(doc_id)
     return success_response({"message": "Document queued for reprocessing.", "document_id": doc_id})
 
@@ -144,6 +151,6 @@ def serve_local_document(filename: str):
     No auth required so the processing pipeline can download files internally.
     """
     import os
+
     upload_dir = os.path.join("/app", "uploads")
     return send_from_directory(upload_dir, filename)
-

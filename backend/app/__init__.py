@@ -3,13 +3,13 @@ IntelliDesk AI — Application Factory
 Creates and configures the Flask application instance.
 """
 
-import os
 import logging
+import os
 
 from flask import Flask
 
 from app.config.settings import config
-from app.extensions import db, migrate, jwt, ma, cors, socketio, limiter, mail
+from app.extensions import cors, db, jwt, limiter, ma, mail, migrate, socketio
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -77,17 +77,17 @@ def _init_extensions(app: Flask) -> None:
 def _register_blueprints(app: Flask) -> None:
     """Register all Flask Blueprint controllers."""
     from app.controllers import health_bp
-    from app.controllers.auth_controller import auth_bp
-    from app.controllers.user_controller import user_bp
-    from app.controllers.department_controller import department_bp
-    from app.controllers.ticket_controller import ticket_bp
-    from app.controllers.incident_controller import incident_bp, problem_bp, notification_bp
-    from app.controllers.dashboard_controller import dashboard_bp
-    from app.controllers.knowledge_controller import knowledge_bp
-    from app.controllers.document_controller import document_bp
     from app.controllers.ai_controller import ai_bp
     from app.controllers.analytics_controller import analytics_bp
+    from app.controllers.auth_controller import auth_bp
+    from app.controllers.dashboard_controller import dashboard_bp
+    from app.controllers.department_controller import department_bp
+    from app.controllers.document_controller import document_bp
+    from app.controllers.incident_controller import incident_bp, notification_bp, problem_bp
+    from app.controllers.knowledge_controller import knowledge_bp
     from app.controllers.report_controller import report_bp
+    from app.controllers.ticket_controller import ticket_bp
+    from app.controllers.user_controller import user_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
@@ -110,12 +110,12 @@ def _register_blueprints(app: Flask) -> None:
 def _register_error_handlers(app: Flask) -> None:
     """Register global error handlers."""
     from app.utils.exceptions import (
+        AuthenticationError,
+        AuthorizationError,
+        BusinessLogicError,
+        ConflictError,
         NotFoundError,
         ValidationError,
-        AuthorizationError,
-        AuthenticationError,
-        ConflictError,
-        BusinessLogicError,
     )
     from app.utils.response import error_response
 
@@ -201,7 +201,9 @@ def _configure_jwt(app: Flask) -> None:
     def expired_token_callback(jwt_header, jwt_payload):
         from app.utils.response import error_response
 
-        return error_response("TOKEN_EXPIRED", "Your session has expired. Please log in again.", 401)
+        return error_response(
+            "TOKEN_EXPIRED", "Your session has expired. Please log in again.", 401
+        )
 
     @jwt.invalid_token_loader
     def invalid_token_callback(error):

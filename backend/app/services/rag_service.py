@@ -8,6 +8,7 @@ import uuid
 from typing import Optional
 
 from flask import current_app
+
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,6 +25,7 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         from sentence_transformers import SentenceTransformer
+
         model_name = current_app.config.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         logger.info(f"Loading embedding model: {model_name}")
         _embedding_model = SentenceTransformer(model_name)
@@ -34,6 +36,7 @@ def get_embedding_model():
 def get_chroma_client():
     """Get ChromaDB HTTP client connected to the configured server."""
     import chromadb
+
     host = current_app.config.get("CHROMA_HOST", "localhost")
     port = current_app.config.get("CHROMA_PORT", 8001)
     return chromadb.HttpClient(host=host, port=int(port))
@@ -120,8 +123,8 @@ class RAGService:
             # Delete old entries if re-indexing
             try:
                 existing_ids = [
-                    doc["id"] for doc in
-                    collection.get(where={"article_id": str(article.id)})["ids"]
+                    doc["id"]
+                    for doc in collection.get(where={"article_id": str(article.id)})["ids"]
                 ]
                 if existing_ids:
                     collection.delete(ids=existing_ids)
@@ -132,13 +135,16 @@ class RAGService:
                 ids=chroma_ids,
                 embeddings=embeddings,
                 documents=chunks,
-                metadatas=[{
-                    "article_id": str(article.id),
-                    "title": article.title,
-                    "slug": article.slug,
-                    "chunk_index": str(i),
-                    "source": "article",
-                } for i in range(len(chunks))],
+                metadatas=[
+                    {
+                        "article_id": str(article.id),
+                        "title": article.title,
+                        "slug": article.slug,
+                        "chunk_index": str(i),
+                        "source": "article",
+                    }
+                    for i in range(len(chunks))
+                ],
             )
 
             # Mark article as indexed in DB
@@ -192,12 +198,15 @@ class RAGService:
                 ids=chroma_ids,
                 embeddings=embeddings,
                 documents=chunks,
-                metadatas=[{
-                    "document_id": str(document.id),
-                    "file_name": document.file_name,
-                    "chunk_index": str(i),
-                    "source": "document",
-                } for i in range(len(chunks))],
+                metadatas=[
+                    {
+                        "document_id": str(document.id),
+                        "file_name": document.file_name,
+                        "chunk_index": str(i),
+                        "source": "document",
+                    }
+                    for i in range(len(chunks))
+                ],
             )
 
             logger.info(f"Document {document.id} indexed: {len(chunks)} chunks.")
@@ -256,12 +265,16 @@ class RAGService:
                         results["metadatas"][0],
                         results["distances"][0],
                     ):
-                        all_results.append({
-                            "content": doc,
-                            "metadata": meta,
-                            "score": round(1 - dist, 4),  # Cosine similarity (0-1, higher=better)
-                            "collection": coll_name,
-                        })
+                        all_results.append(
+                            {
+                                "content": doc,
+                                "metadata": meta,
+                                "score": round(
+                                    1 - dist, 4
+                                ),  # Cosine similarity (0-1, higher=better)
+                                "collection": coll_name,
+                            }
+                        )
 
                 except Exception:
                     # Collection may not exist yet (no documents indexed)
@@ -295,7 +308,7 @@ class RAGService:
             meta = result["metadata"]
             source_label = meta.get("title") or meta.get("file_name") or "Knowledge Base"
             context_parts.append(
-                f"[Source {i+1}: {source_label} (score: {result['score']})]\n{result['content']}"
+                f"[Source {i + 1}: {source_label} (score: {result['score']})]\n{result['content']}"
             )
 
         return "\n\n---\n\n".join(context_parts)

@@ -6,7 +6,7 @@ Article management, categorization, tagging, and engagement tracking.
 from datetime import datetime, timezone
 
 from app.extensions import db
-from app.models.base import TimestampMixin, SoftDeleteMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin
 from app.utils.constants import ArticleStatus
 
 # ─── Association Tables ───────────────────────────────────────────────────────
@@ -20,7 +20,9 @@ article_tags = db.Table(
 article_categories = db.Table(
     "article_categories",
     db.Column("article_id", db.Integer, db.ForeignKey("knowledge_articles.id"), primary_key=True),
-    db.Column("category_id", db.Integer, db.ForeignKey("article_category_list.id"), primary_key=True),
+    db.Column(
+        "category_id", db.Integer, db.ForeignKey("article_category_list.id"), primary_key=True
+    ),
 )
 
 
@@ -40,7 +42,9 @@ class ArticleCategory(db.Model, TimestampMixin):
 
     # Self-referential relationship for subcategories
     parent = db.relationship("ArticleCategory", remote_side=[id], backref="children")
-    articles = db.relationship("KnowledgeArticle", secondary=article_categories, back_populates="categories")
+    articles = db.relationship(
+        "KnowledgeArticle", secondary=article_categories, back_populates="categories"
+    )
 
     def __repr__(self) -> str:
         return f"<ArticleCategory {self.name}>"
@@ -105,7 +109,9 @@ class KnowledgeArticle(db.Model, TimestampMixin, SoftDeleteMixin):
     author = db.relationship("User", foreign_keys=[author_id], backref="authored_articles")
     reviewer = db.relationship("User", foreign_keys=[reviewer_id], backref="reviewed_articles")
     last_editor = db.relationship("User", foreign_keys=[last_edited_by], backref="edited_articles")
-    categories = db.relationship("ArticleCategory", secondary=article_categories, back_populates="articles")
+    categories = db.relationship(
+        "ArticleCategory", secondary=article_categories, back_populates="articles"
+    )
     tags = db.relationship("ArticleTag", secondary=article_tags, back_populates="articles")
     votes = db.relationship("ArticleVote", back_populates="article", cascade="all, delete-orphan")
 
@@ -147,8 +153,10 @@ class ArticleVote(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(
-        db.Integer, db.ForeignKey("knowledge_articles.id", ondelete="CASCADE"),
-        nullable=False, index=True
+        db.Integer,
+        db.ForeignKey("knowledge_articles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     is_helpful = db.Column(db.Boolean, nullable=False)
@@ -158,9 +166,7 @@ class ArticleVote(db.Model):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    __table_args__ = (
-        db.UniqueConstraint("article_id", "user_id", name="uq_article_vote_user"),
-    )
+    __table_args__ = (db.UniqueConstraint("article_id", "user_id", name="uq_article_vote_user"),)
 
     article = db.relationship("KnowledgeArticle", back_populates="votes")
     user = db.relationship("User", foreign_keys=[user_id], backref="article_votes")

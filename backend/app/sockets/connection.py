@@ -5,7 +5,7 @@ Manages Socket.IO connect/disconnect events with JWT authentication.
 
 from flask import request
 from flask_jwt_extended import decode_token
-from flask_socketio import emit, join_room, leave_room, disconnect
+from flask_socketio import disconnect, emit, join_room, leave_room
 
 from app.extensions import socketio
 from app.utils.logger import get_logger
@@ -43,11 +43,14 @@ def handle_connect(auth):
         join_room(f"role:{role}")
 
         logger.info(f"WebSocket connected: user={user_id} sid={request.sid}")
-        emit("connected", {
-            "status": "connected",
-            "user_id": user_id,
-            "message": "Real-time connection established.",
-        })
+        emit(
+            "connected",
+            {
+                "status": "connected",
+                "user_id": user_id,
+                "message": "Real-time connection established.",
+            },
+        )
 
     except Exception as e:
         logger.warning(f"WebSocket connection rejected — invalid token: {e}")

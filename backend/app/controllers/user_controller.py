@@ -5,21 +5,26 @@ Route prefix: /api/v1/users
 """
 
 from flask import Blueprint
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app.repositories.user_repository import UserRepository, RoleRepository
-from app.services.audit_service import AuditService
 from app.dtos.auth_dto import (
-    UserResponseSchema,
-    UserSummarySchema,
     UpdateProfileSchema,
     UpdateUserAdminSchema,
     UserListQuerySchema,
+    UserResponseSchema,
+    UserSummarySchema,
 )
-from app.utils.decorators import role_required, validate_body, validate_query, get_current_user_id
-from app.utils.response import success_response, no_content_response, build_pagination_meta, paginated_response
-from app.utils.constants import UserRole, AuditAction
-from app.utils.exceptions import NotFoundError, AuthorizationError, ValidationError
+from app.repositories.user_repository import RoleRepository, UserRepository
+from app.services.audit_service import AuditService
+from app.utils.constants import AuditAction, UserRole
+from app.utils.decorators import get_current_user_id, role_required, validate_body, validate_query
+from app.utils.exceptions import AuthorizationError, NotFoundError, ValidationError
+from app.utils.response import (
+    build_pagination_meta,
+    no_content_response,
+    paginated_response,
+    success_response,
+)
 
 user_bp = Blueprint("users", __name__, url_prefix="/api/v1/users")
 
@@ -56,9 +61,9 @@ def list_assignable_users():
     """
     from app.models.user import User
     from app.utils.constants import UserStatus
+
     assignable = (
-        User.query
-        .filter(
+        User.query.filter(
             User.role.has(name=UserRole.AGENT.value) | User.role.has(name=UserRole.MANAGER.value),
             User.status == UserStatus.ACTIVE.value,
             User.deleted_at.is_(None),
@@ -106,9 +111,13 @@ def update_my_profile(data: dict):
 @user_bp.route("/me/change-password", methods=["PUT"])
 @jwt_required()
 @validate_body(
-    type("ChangePasswordSchema", (), {
-        "__module__": __name__,
-    })
+    type(
+        "ChangePasswordSchema",
+        (),
+        {
+            "__module__": __name__,
+        },
+    )
 )
 def change_password(data: dict):
     """PUT /api/v1/users/me/change-password — Change own password."""
@@ -124,6 +133,7 @@ def change_password(data: dict):
 
     user.set_password(data["new_password"])
     from app.extensions import db
+
     db.session.commit()
 
     AuditService.log(
@@ -157,6 +167,7 @@ def update_user(data: dict, user_id: int):
 
     # Prevent admin from modifying super_admin
     from app.utils.decorators import get_current_user_role
+
     current_role = get_current_user_role()
     if user.role_name == UserRole.SUPER_ADMIN.value and current_role != UserRole.SUPER_ADMIN.value:
         raise AuthorizationError("Cannot modify a Super Admin account.")
@@ -209,5 +220,6 @@ def delete_user(user_id: int):
 def list_roles():
     """GET /api/v1/users/roles — List all available roles (Admin+)."""
     from app.dtos.auth_dto import RoleSchema
+
     roles = RoleRepository.get_all()
     return success_response(RoleSchema(many=True).dump(roles))

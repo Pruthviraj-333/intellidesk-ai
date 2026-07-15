@@ -57,4 +57,3 @@ def index_article_task(self, article_id: int):
     except Exception as exc:
         logger.error(f"Article indexing task failed for article={article_id}: {exc}")
         raise self.retry(exc=exc)
-
