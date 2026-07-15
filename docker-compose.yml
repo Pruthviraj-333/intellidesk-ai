@@ -36,16 +36,13 @@ services:
 
   # ─── ChromaDB (Vector Database) ────────────────────────────────────────────
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.5
     container_name: intellidesk_chromadb
     restart: unless-stopped
-    environment:
-      CHROMA_SERVER_HOST: 0.0.0.0
-      CHROMA_SERVER_HTTP_PORT: 8001
     volumes:
       - chroma_data:/chroma/.chroma/index
     ports:
-      - "8001:8001"
+      - "8001:8000"  # ChromaDB always listens on 8000 internally
 
   # ─── Flask Backend ──────────────────────────────────────────────────────────
   backend:
@@ -61,7 +58,7 @@ services:
       DATABASE_URL: postgresql://intellidesk:${DB_PASSWORD:-intellidesk_password}@postgres:5432/intellidesk
       REDIS_URL: redis://redis:6379/0
       CHROMA_HOST: chromadb
-      CHROMA_PORT: 8001
+      CHROMA_PORT: 8000  # ChromaDB internal port
     volumes:
       - ./backend:/app
       - /app/__pycache__
@@ -97,7 +94,7 @@ services:
       DATABASE_URL: postgresql://intellidesk:${DB_PASSWORD:-intellidesk_password}@postgres:5432/intellidesk
       REDIS_URL: redis://redis:6379/0
       CHROMA_HOST: chromadb
-      CHROMA_PORT: 8001
+      CHROMA_PORT: 8000  # ChromaDB internal port
     volumes:
       - ./backend:/app
     depends_on:

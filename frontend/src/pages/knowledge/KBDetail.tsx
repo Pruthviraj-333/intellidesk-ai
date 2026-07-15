@@ -9,14 +9,14 @@ interface ArticleDetail {
   title: string;
   slug: string;
   body: string;
-  short_summary: string;
-  category: { id: number; name: string } | null;
-  author: { id: number; first_name: string; last_name: string } | null;
-  upvotes: number;
-  downvotes: number;
-  views: number;
+  summary: string | null;          // API returns 'summary'
+  categories: { id: number; name: string }[];  // API returns array
+  author: { id: number; full_name: string } | null;  // API returns 'full_name'
+  helpful_count: number;           // API returns 'helpful_count'
+  not_helpful_count: number;       // API returns 'not_helpful_count'
+  view_count: number;              // API returns 'view_count'
   created_at: string;
-  tags: string[];
+  tags: { id: number; name: string; slug: string }[];  // tags are objects
 }
 
 export const KBDetail: React.FC = () => {
@@ -45,13 +45,12 @@ export const KBDetail: React.FC = () => {
     }
   };
 
-  const handleVote = async (voteType: number) => {
+  const handleVote = async (isHelpful: boolean) => {
     if (!article) return;
     try {
-      await api.post(`/knowledge/articles/${article.id}/vote`, { vote_type: voteType });
-      // Reload article to get updated vote counts
+      await api.post(`/knowledge/articles/${article.id}/vote`, { is_helpful: isHelpful });
       fetchArticle();
-      setUserVote(voteType);
+      setUserVote(isHelpful ? 1 : -1);
     } catch (e) {
       console.error(e);
     }
@@ -83,13 +82,15 @@ export const KBDetail: React.FC = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.75rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <User size={16} />
-                <span>By {article.author ? `${article.author.first_name} ${article.author.last_name}` : 'System'}</span>
+                <span>
+                  By {article.author?.full_name || 'System'}
+                </span>
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <Calendar size={16} />
                 <span>{new Date(article.created_at).toLocaleDateString()}</span>
               </span>
-              <span className="badge badge-info">{article.category?.name || 'Uncategorized'}</span>
+              <span className="badge badge-info">{article.categories?.[0]?.name || 'Uncategorized'}</span>
             </div>
           </div>
           {isAuthorOrAdmin && (
@@ -100,9 +101,9 @@ export const KBDetail: React.FC = () => {
           )}
         </div>
 
-        {article.short_summary && (
+        {article.summary && (
           <div style={{ padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', borderLeft: '4px solid var(--info)', fontStyle: 'italic', color: 'var(--text-secondary)' }}>
-            {article.short_summary}
+            {article.summary}
           </div>
         )}
 
@@ -118,8 +119,8 @@ export const KBDetail: React.FC = () => {
         {article.tags && article.tags.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
             {article.tags.map(tag => (
-              <span key={tag} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '50px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                #{tag}
+              <span key={tag.id} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '50px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                #{tag.name}
               </span>
             ))}
           </div>
@@ -135,7 +136,7 @@ export const KBDetail: React.FC = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
             <Eye size={18} />
-            <span>{article.views} views</span>
+            <span>{article.view_count} views</span>
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -143,18 +144,18 @@ export const KBDetail: React.FC = () => {
             <button 
               className={`btn ${userVote === 1 ? 'btn-primary' : 'btn-secondary'}`} 
               style={{ padding: '0.5rem 1rem' }}
-              onClick={() => handleVote(1)}
+              onClick={() => handleVote(true)}
             >
               <ThumbsUp size={16} />
-              <span>Yes ({article.upvotes})</span>
+              <span>Yes ({article.helpful_count})</span>
             </button>
             <button 
               className={`btn ${userVote === -1 ? 'btn-danger' : 'btn-secondary'}`} 
               style={{ padding: '0.5rem 1rem' }}
-              onClick={() => handleVote(-1)}
+              onClick={() => handleVote(false)}
             >
               <ThumbsDown size={16} />
-              <span>No ({article.downvotes})</span>
+              <span>No ({article.not_helpful_count})</span>
             </button>
           </div>
         </div>

@@ -69,10 +69,10 @@ export const KBEditor: React.FC = () => {
 
     const payload = {
       title,
-      category_id: categoryId ? Number(categoryId) : null,
-      short_summary: shortSummary,
+      category_ids: categoryId ? [Number(categoryId)] : [],
+      summary: shortSummary,
       body,
-      tags
+      tag_names: tags,
     };
 
     try {

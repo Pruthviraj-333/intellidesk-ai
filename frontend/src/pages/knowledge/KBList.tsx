@@ -8,11 +8,11 @@ interface Article {
   id: number;
   title: string;
   slug: string;
-  short_summary: string;
-  category: { id: number; name: string } | null;
-  author: { first_name: string; last_name: string } | null;
-  upvotes: number;
-  views: number;
+  summary: string | null;        // API returns 'summary', not 'short_summary'
+  categories: { id: number; name: string }[];  // API returns array, not single object
+  author: { id: number; full_name: string } | null;  // API returns 'full_name'
+  helpful_count: number;         // API returns 'helpful_count', not 'upvotes'
+  view_count: number;            // API returns 'view_count', not 'views'
   status: string;
   created_at: string;
 }
@@ -174,19 +174,19 @@ export const KBList: React.FC = () => {
                     <Link to={`/knowledge/articles/${art.slug}`}>
                       <h3 style={{ color: 'var(--primary)', cursor: 'pointer' }}>{art.title}</h3>
                     </Link>
-                    <span className="badge badge-info">{art.category?.name || 'Uncategorized'}</span>
+                    <span className="badge badge-info">{art.categories?.[0]?.name || 'Uncategorized'}</span>
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                    {art.short_summary || 'No summary available.'}
+                     {art.summary || 'No summary available.'}
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <span>By {art.author ? `${art.author.first_name} ${art.author.last_name}` : 'System'} • {new Date(art.created_at).toLocaleDateString()}</span>
+                     <span>By {art.author?.full_name || 'System'} • {new Date(art.created_at).toLocaleDateString()}</span>
                     <div style={{ display: 'flex', gap: '1rem' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <Eye size={14} /> {art.views}
+                        <Eye size={14} /> {art.view_count}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <ThumbsUp size={14} /> {art.upvotes}
+                        <ThumbsUp size={14} /> {art.helpful_count}
                       </span>
                     </div>
                   </div>

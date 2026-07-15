@@ -61,7 +61,7 @@ class BaseConfig:
 
     # ─── ChromaDB ───────────────────────────────────────────────────────────────
     CHROMA_HOST: str = os.environ.get("CHROMA_HOST", "localhost")
-    CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8001"))
+    CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))
 
     # ─── AI (Groq) ──────────────────────────────────────────────────────────────
     LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "groq")
@@ -98,6 +98,10 @@ class DevelopmentConfig(BaseConfig):
 
     DEBUG = True
     SQLALCHEMY_ECHO = False  # Set True to see all SQL queries
+    # Disable rate limiting in development — all Docker traffic
+    # appears to come from the same IP (Nginx proxy), so limits
+    # are exhausted almost instantly during normal usage.
+    RATELIMIT_ENABLED = False
 
 
 class ProductionConfig(BaseConfig):
