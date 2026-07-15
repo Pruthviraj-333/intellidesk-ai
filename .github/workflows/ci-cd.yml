@@ -98,13 +98,13 @@ jobs:
       FLASK_ENV: testing
       SECRET_KEY: ci-unit-test-secret
       JWT_SECRET_KEY: ci-unit-test-jwt
-      DATABASE_URL: sqlite:///:memory:
-      REDIS_URL: redis://localhost:6379/0
+      DATABASE_URL: "sqlite:///:memory:"
+      REDIS_URL: "redis://localhost:6379/0"
       GROQ_API_KEY: dummy-key-for-ci
       GMAIL_USER: ci@test.com
       GMAIL_APP_PASSWORD: dummy
-      CLOUDINARY_URL: cloudinary://key:secret@cloud
-      FRONTEND_URL: http://localhost:5173
+      CLOUDINARY_URL: "cloudinary://key:secret@cloud"
+      FRONTEND_URL: "http://localhost:5173"
       CHROMA_HOST: localhost
       CHROMA_PORT: "8001"
       EMBEDDING_MODEL: all-MiniLM-L6-v2
@@ -188,13 +188,13 @@ jobs:
       FLASK_ENV: testing
       SECRET_KEY: ci-integration-test-secret
       JWT_SECRET_KEY: ci-integration-test-jwt
-      DATABASE_URL: postgresql://intellidesk:test_password@localhost:5432/intellidesk_test
-      REDIS_URL: redis://localhost:6379/0
+      DATABASE_URL: "postgresql://intellidesk:test_password@localhost:5432/intellidesk_test"
+      REDIS_URL: "redis://localhost:6379/0"
       GROQ_API_KEY: dummy-key-for-ci
       GMAIL_USER: ci@test.com
       GMAIL_APP_PASSWORD: dummy
-      CLOUDINARY_URL: cloudinary://key:secret@cloud
-      FRONTEND_URL: http://localhost:5173
+      CLOUDINARY_URL: "cloudinary://key:secret@cloud"
+      FRONTEND_URL: "http://localhost:5173"
       CHROMA_HOST: localhost
       CHROMA_PORT: "8001"
       EMBEDDING_MODEL: all-MiniLM-L6-v2
@@ -317,13 +317,13 @@ jobs:
       FLASK_ENV: development
       SECRET_KEY: ci-e2e-test-secret
       JWT_SECRET_KEY: ci-e2e-test-jwt
-      DATABASE_URL: postgresql://intellidesk:test_password@localhost:5432/intellidesk_test
-      REDIS_URL: redis://localhost:6379/0
+      DATABASE_URL: "postgresql://intellidesk:test_password@localhost:5432/intellidesk_test"
+      REDIS_URL: "redis://localhost:6379/0"
       GROQ_API_KEY: dummy-key-for-ci
       GMAIL_USER: ci@test.com
       GMAIL_APP_PASSWORD: dummy
-      CLOUDINARY_URL: cloudinary://key:secret@cloud
-      FRONTEND_URL: http://localhost:5173
+      CLOUDINARY_URL: "cloudinary://key:secret@cloud"
+      FRONTEND_URL: "http://localhost:5173"
       CHROMA_HOST: localhost
       CHROMA_PORT: "8001"
       EMBEDDING_MODEL: all-MiniLM-L6-v2
