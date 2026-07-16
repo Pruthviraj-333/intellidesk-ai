@@ -7,10 +7,7 @@ Route prefix: /api/v1/documents
 from flask import Blueprint, request, send_from_directory
 from flask_jwt_extended import jwt_required
 
-from app.dtos.knowledge_dto import (
-    DocumentListQuerySchema,
-    DocumentResponseSchema,
-)
+from app.dtos.knowledge_dto import DocumentListQuerySchema, DocumentResponseSchema
 from app.repositories.document_repository import DocumentRepository
 from app.services.document_service import DocumentService
 from app.utils.constants import UserRole

@@ -5,11 +5,7 @@ Route prefix: /api/v1/auth
 """
 
 from flask import Blueprint
-from flask_jwt_extended import (
-    get_jwt,
-    get_jwt_identity,
-    jwt_required,
-)
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
