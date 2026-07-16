@@ -44,8 +44,8 @@ class TestTicketTrends:
         resp = client.get("/api/v1/dashboard/ticket-trends", headers=auth_headers_manager)
         assert resp.status_code == 200
         data = resp.get_json()["data"]
-        assert "created" in data
-        assert "resolved" in data
+        assert "trends" in data
+        assert "data_points" in data
         assert data["period_days"] == 30
 
     def test_employee_cannot_get_trends(self, client, auth_headers_employee):
