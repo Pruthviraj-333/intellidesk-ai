@@ -16,14 +16,14 @@
 | Project Name     | IntelliDesk AI                                               |
 | Product Version  | 1.0.0                                                        |
 | Status           | Draft — Pending Stakeholder Review                           |
-| Last Updated     | 2026-07-06                                                   |
+| Last Updated     |                                                              |
 
 ### Revision History
 
 | Version | Date       | Author               | Description                    |
 |---------|------------|-----------------------|--------------------------------|
-| 0.1     | 2026-07-06 | Engineering Team      | Initial draft                  |
-| 1.0     | 2026-07-06 | Engineering Team      | First complete SRS release     |
+| 0.1     |            | Engineering Team      | Initial draft                  |
+| 1.0     |            | Engineering Team      | First complete SRS release     |
 
 ### Approval Matrix
 

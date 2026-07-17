@@ -1,6 +1,6 @@
 # IntelliDesk AI — Development Roadmap
 
-**Document ID:** IDAI-ROAD-001 | **Version:** 1.0 | **Date:** 2026-07-06
+**Document ID:** IDAI-ROAD-001 | **Version:** 1.0 | **Date:** 
 
 ---
 

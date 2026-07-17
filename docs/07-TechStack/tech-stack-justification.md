@@ -1,6 +1,6 @@
 # IntelliDesk AI — Tech Stack Justification
 
-**Document ID:** IDAI-TECH-001 | **Version:** 1.0 | **Date:** 2026-07-06
+**Document ID:** IDAI-TECH-001 | **Version:** 1.0 | **Date:** 
 
 ---
 

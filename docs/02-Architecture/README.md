@@ -1,6 +1,6 @@
 # IntelliDesk AI — Architecture Design Document
 
-**Document ID:** IDAI-ARCH-001 | **Version:** 1.0 | **Date:** 2026-07-06
+**Document ID:** IDAI-ARCH-001 | **Version:** 1.0 | **Date:** 
 
 ---
 
