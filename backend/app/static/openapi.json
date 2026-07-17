@@ -1,0 +1,1334 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IntelliDesk AI — API Specification",
+    "description": "Comprehensive interactive REST API documentation for the IntelliDesk AI platform, including user authentication, ticketing, SLA management, incident handling, and AI-powered knowledge base operations.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Local Gateway (default)"
+    },
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Flask Backend Direct"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Health Check", "description": "System health and status endpoints" },
+    { "name": "Authentication", "description": "User registration, login, token refresh, and password recovery" },
+    { "name": "User Management", "description": "Profile updates and administrative user control" },
+    { "name": "Departments", "description": "Manage business departments" },
+    { "name": "Tickets", "description": "Create, assign, update, and comment on helpdesk tickets" },
+    { "name": "Incidents", "description": "Track outages, service degradations, and incident timelines" },
+    { "name": "Problems", "description": "Root-cause analysis and problem management" },
+    { "name": "Notifications", "description": "In-app and email alert management" },
+    { "name": "Dashboard", "description": "Aggregated metrics and charts for agents and managers" },
+    { "name": "Knowledge Base", "description": "Create, search, rate, and manage KB articles" },
+    { "name": "Documents", "description": "Upload, view, and reprocess uploaded attachments" },
+    { "name": "AI Assistant", "description": "RAG chat assistant, ticket classification, and auto-suggested responses" },
+    { "name": "Analytics", "description": "Platform performance metrics and trends" },
+    { "name": "Reports", "description": "Export data and download PDF/CSV reports" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health Check"],
+        "summary": "Public Health Check",
+        "description": "Basic status check indicating whether the server is up.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": { "type": "string", "example": "healthy" },
+                        "version": { "type": "string", "example": "1.0.0" },
+                        "environment": { "type": "string", "example": "development" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/detailed": {
+      "get": {
+        "tags": ["Health Check"],
+        "summary": "Detailed Health Status",
+        "description": "Check status of DB, Redis, and vector search services. Requires Admin+ role.",
+        "responses": {
+          "200": { "description": "Detailed health diagnostics" },
+          "403": { "description": "Forbidden - Insufficient permissions" }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register a new user",
+        "description": "Create a new employee/user account. Requires email verification to activate.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password", "confirm_password", "first_name", "last_name"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "john.doe@company.com" },
+                  "password": { "type": "string", "format": "password", "example": "SecurePass@123" },
+                  "confirm_password": { "type": "string", "format": "password", "example": "SecurePass@123" },
+                  "first_name": { "type": "string", "example": "John" },
+                  "last_name": { "type": "string", "example": "Doe" },
+                  "department_id": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation failure" },
+          "409": { "description": "Email already exists" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "User Login",
+        "description": "Authenticate user credentials and retrieve access + refresh JWT tokens.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "admin@intellidesk.ai" },
+                  "password": { "type": "string", "format": "password", "example": "Admin@123!" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful authentication",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "access_token": { "type": "string", "example": "eyJhbGciOi..." },
+                        "refresh_token": { "type": "string", "example": "eyJhbGciOi..." },
+                        "token_type": { "type": "string", "example": "Bearer" },
+                        "expires_in": { "type": "integer", "example": 900 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Refresh Access Token",
+        "description": "Get a new access token using a refresh token.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                  "refresh_token": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "New tokens generated" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Revoke Session",
+        "description": "Log out and block current JWT access/refresh tokens in Redis.",
+        "responses": {
+          "200": { "description": "Logged out successfully" }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Forgot Password Request",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": { "email": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Reset email dispatched if account exists" }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Reset Password",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password", "confirm_password"],
+                "properties": {
+                  "token": { "type": "string" },
+                  "password": { "type": "string" },
+                  "confirm_password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password updated successfully" }
+        }
+      }
+    },
+    "/auth/verify-email/{token}": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Verify Email Address",
+        "security": [],
+        "parameters": [
+          { "name": "token", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Email verified successfully" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Current User Profile",
+        "description": "Retrieve profile details of the currently authenticated JWT user.",
+        "responses": {
+          "200": {
+            "description": "Profile data retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["User Management"],
+        "summary": "List Users",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "role", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Paginated list of users" },
+          "403": { "description": "Admin privileges required" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": ["User Management"],
+        "summary": "Get User Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "User detail schema" }
+        }
+      },
+      "put": {
+        "tags": ["User Management"],
+        "summary": "Update User Settings",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "User updated successfully" }
+        }
+      },
+      "delete": {
+        "tags": ["User Management"],
+        "summary": "Soft Delete User",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "User deleted" }
+        }
+      }
+    },
+    "/users/{id}/role": {
+      "put": {
+        "tags": ["User Management"],
+        "summary": "Change User Role",
+        "description": "Change role of a user (Admin/Super Admin only).",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": {
+                  "role": { "type": "string", "enum": ["employee", "agent", "manager", "admin", "super_admin"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Role changed successfully" }
+        }
+      }
+    },
+    "/users/{id}/status": {
+      "put": {
+        "tags": ["User Management"],
+        "summary": "Toggle User Status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["active", "suspended", "pending_verification"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated successfully" }
+        }
+      }
+    },
+    "/users/me": {
+      "put": {
+        "tags": ["User Management"],
+        "summary": "Update Own Profile",
+        "responses": {
+          "200": { "description": "Profile updated" }
+        }
+      }
+    },
+    "/users/me/password": {
+      "put": {
+        "tags": ["User Management"],
+        "summary": "Change Password",
+        "responses": {
+          "200": { "description": "Password updated successfully" }
+        }
+      }
+    },
+    "/departments": {
+      "get": {
+        "tags": ["Departments"],
+        "summary": "List Departments",
+        "responses": {
+          "200": { "description": "List of all departments" }
+        }
+      },
+      "post": {
+        "tags": ["Departments"],
+        "summary": "Create Department",
+        "responses": {
+          "201": { "description": "Department created" }
+        }
+      }
+    },
+    "/departments/{id}": {
+      "put": {
+        "tags": ["Departments"],
+        "summary": "Update Department",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Department updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Departments"],
+        "summary": "Delete Department",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Department deleted" }
+        }
+      }
+    },
+    "/tickets": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "List Tickets",
+        "description": "Retrieve tickets. Scoped automatically by role (employees see own, agents/managers see all scoped to department).",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["new", "open", "pending", "resolved", "closed"] } },
+          { "name": "priority", "in": "query", "schema": { "type": "string", "enum": ["low", "medium", "high", "critical"] } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ticket" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Create Ticket",
+        "description": "Submit a new support ticket.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description", "category"],
+                "properties": {
+                  "title": { "type": "string", "example": "Printer setup issues on 3rd floor" },
+                  "description": { "type": "string", "example": "Cannot connect to the office printer from my laptop." },
+                  "category": { "type": "string", "example": "Hardware" },
+                  "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"], "default": "medium" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": { "$ref": "#/components/schemas/Ticket" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{id}": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "Get Ticket Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ticket details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": { "$ref": "#/components/schemas/Ticket" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Tickets"],
+        "summary": "Update Ticket Status / Priority",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["open", "pending", "resolved", "closed"] },
+                  "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+                  "resolution_notes": { "type": "string", "example": "Configured the printer server IP manually." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ticket updated successfully" }
+        }
+      },
+      "delete": {
+        "tags": ["Tickets"],
+        "summary": "Soft Delete Ticket",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Ticket soft-deleted" }
+        }
+      }
+    },
+    "/tickets/{id}/assign": {
+      "put": {
+        "tags": ["Tickets"],
+        "summary": "Assign Ticket to Agent",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["assigned_to_id"],
+                "properties": {
+                  "assigned_to_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ticket assigned successfully" }
+        }
+      }
+    },
+    "/tickets/bulk-update": {
+      "put": {
+        "tags": ["Tickets"],
+        "summary": "Bulk Update Tickets",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ticket_ids"],
+                "properties": {
+                  "ticket_ids": { "type": "array", "items": { "type": "integer" } },
+                  "status": { "type": "string" },
+                  "assigned_to_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tickets updated successfully" }
+        }
+      }
+    },
+    "/tickets/{id}/comments": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "List Ticket Comments",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of comment objects" }
+        }
+      },
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Add Comment to Ticket",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["body"],
+                "properties": {
+                  "body": { "type": "string", "example": "Is there any update on this?" },
+                  "is_private": { "type": "boolean", "default": false }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Comment added" }
+        }
+      }
+    },
+    "/tickets/{id}/comments/{cid}": {
+      "delete": {
+        "tags": ["Tickets"],
+        "summary": "Delete Comment",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "cid", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Comment deleted" }
+        }
+      }
+    },
+    "/incidents": {
+      "get": {
+        "tags": ["Incidents"],
+        "summary": "List Incidents",
+        "responses": {
+          "200": { "description": "List of incidents" }
+        }
+      },
+      "post": {
+        "tags": ["Incidents"],
+        "summary": "Create Incident Record",
+        "responses": {
+          "201": { "description": "Incident created" }
+        }
+      }
+    },
+    "/incidents/{id}": {
+      "get": {
+        "tags": ["Incidents"],
+        "summary": "Get Incident Detail",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Incident data" }
+        }
+      },
+      "put": {
+        "tags": ["Incidents"],
+        "summary": "Update Incident Status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Incident updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Incidents"],
+        "summary": "Soft Delete Incident",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Incident deleted" }
+        }
+      }
+    },
+    "/incidents/{id}/timeline": {
+      "post": {
+        "tags": ["Incidents"],
+        "summary": "Add Timeline Event",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "201": { "description": "Event added to timeline" }
+        }
+      }
+    },
+    "/problems": {
+      "get": {
+        "tags": ["Problems"],
+        "summary": "List Problems",
+        "responses": {
+          "200": { "description": "List of problems" }
+        }
+      },
+      "post": {
+        "tags": ["Problems"],
+        "summary": "Create Problem Record",
+        "responses": {
+          "201": { "description": "Problem logged" }
+        }
+      }
+    },
+    "/problems/{id}": {
+      "get": {
+        "tags": ["Problems"],
+        "summary": "Get Problem Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Problem details" }
+        }
+      },
+      "put": {
+        "tags": ["Problems"],
+        "summary": "Update Problem Root Cause",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Problem updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Problems"],
+        "summary": "Delete Problem",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Problem deleted" }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get Own Notifications",
+        "responses": {
+          "200": { "description": "Array of notifications" }
+        }
+      }
+    },
+    "/notifications/{id}/read": {
+      "put": {
+        "tags": ["Notifications"],
+        "summary": "Mark Notification Read",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Marked read successfully" }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "put": {
+        "tags": ["Notifications"],
+        "summary": "Mark All Notifications Read",
+        "responses": {
+          "200": { "description": "All notifications marked read" }
+        }
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Aggregated KPI Summary",
+        "responses": {
+          "200": { "description": "Aggregated stats summary" }
+        }
+      }
+    },
+    "/dashboard/ticket-trends": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Ticket Creation and Resolution Trends",
+        "parameters": [
+          { "name": "days", "in": "query", "schema": { "type": "integer", "default": 30 } }
+        ],
+        "responses": {
+          "200": { "description": "Trends data points array" }
+        }
+      }
+    },
+    "/dashboard/sla-compliance": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "SLA Compliance By Priority",
+        "responses": {
+          "200": { "description": "SLA percentages by priority" }
+        }
+      }
+    },
+    "/dashboard/agent-performance": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Agent Performance Metrics",
+        "responses": {
+          "200": { "description": "Agent performance leaderboard" }
+        }
+      }
+    },
+    "/knowledge/articles": {
+      "get": {
+        "tags": ["Knowledge Base"],
+        "summary": "List/Search Articles",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Array of matching articles" }
+        }
+      },
+      "post": {
+        "tags": ["Knowledge Base"],
+        "summary": "Create Draft Article",
+        "responses": {
+          "201": { "description": "Draft article created" }
+        }
+      }
+    },
+    "/knowledge/articles/{slug}": {
+      "get": {
+        "tags": ["Knowledge Base"],
+        "summary": "Get Article Details",
+        "parameters": [
+          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Article details object" }
+        }
+      }
+    },
+    "/knowledge/articles/{id}": {
+      "put": {
+        "tags": ["Knowledge Base"],
+        "summary": "Update Article Content",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Article updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Knowledge Base"],
+        "summary": "Delete Article",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Article soft-deleted" }
+        }
+      }
+    },
+    "/knowledge/articles/{id}/publish": {
+      "put": {
+        "tags": ["Knowledge Base"],
+        "summary": "Publish and Index Article",
+        "description": "Publish article and synchronize with vector search engine.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Article published and indexed" }
+        }
+      }
+    },
+    "/knowledge/articles/{id}/vote": {
+      "post": {
+        "tags": ["Knowledge Base"],
+        "summary": "Vote on Article Helpfulness",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["vote_type"],
+                "properties": {
+                  "vote_type": { "type": "string", "enum": ["upvote", "downvote"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Vote counted" }
+        }
+      }
+    },
+    "/knowledge/search": {
+      "get": {
+        "tags": ["Knowledge Base"],
+        "summary": "Semantic RAG Search",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Search results array" }
+        }
+      }
+    },
+    "/knowledge/categories": {
+      "get": {
+        "tags": ["Knowledge Base"],
+        "summary": "List Article Categories",
+        "responses": {
+          "200": { "description": "Array of categories" }
+        }
+      },
+      "post": {
+        "tags": ["Knowledge Base"],
+        "summary": "Create KB Category",
+        "responses": {
+          "201": { "description": "Category created" }
+        }
+      }
+    },
+    "/knowledge/tags": {
+      "get": {
+        "tags": ["Knowledge Base"],
+        "summary": "List Article Tags",
+        "responses": {
+          "200": { "description": "Autocomplete tags list" }
+        }
+      }
+    },
+    "/documents": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "List Uploaded Documents",
+        "responses": {
+          "200": { "description": "List of docs" }
+        }
+      },
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Upload New Document",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Document uploaded and queued for processing" }
+        }
+      }
+    },
+    "/documents/{id}": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get Document and OCR Status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Document meta and OCR status details" }
+        }
+      },
+      "delete": {
+        "tags": ["Documents"],
+        "summary": "Soft Delete Document",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "204": { "description": "Document deleted" }
+        }
+      }
+    },
+    "/documents/{id}/reprocess": {
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Reprocess Failed Document",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Reprocess queued" }
+        }
+      }
+    },
+    "/ai/chat": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "AI Chat Assistant",
+        "description": "Send a chat message to the RAG-enabled AI support assistant.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": { "type": "string", "example": "How do I connect to VPN?" },
+                  "session_uuid": { "type": "string", "example": "123e4567-e89b-12d3-a456-426614174000" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI assistant response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "success" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "response": { "type": "string", "example": "To connect to the VPN, make sure you download Cisco AnyConnect..." },
+                        "session_uuid": { "type": "string" },
+                        "sources": { "type": "array", "items": { "type": "object" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/sessions": {
+      "get": {
+        "tags": ["AI Assistant"],
+        "summary": "List Chat Sessions",
+        "responses": {
+          "200": { "description": "Array of past chat sessions" }
+        }
+      }
+    },
+    "/ai/sessions/{uuid}": {
+      "get": {
+        "tags": ["AI Assistant"],
+        "summary": "Get Session History",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Messages history array" }
+        }
+      },
+      "delete": {
+        "tags": ["AI Assistant"],
+        "summary": "Delete Chat Session",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Session deleted" }
+        }
+      }
+    },
+    "/ai/tickets/{id}/classify": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "Classify Ticket",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "AI predicted category and severity" }
+        }
+      }
+    },
+    "/ai/tickets/{id}/classification": {
+      "get": {
+        "tags": ["AI Assistant"],
+        "summary": "Get Classification Results",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Stored AI classification data" }
+        }
+      }
+    },
+    "/ai/tickets/{id}/classification/feedback": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "Provide Classification Feedback",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Feedback submitted successfully" }
+        }
+      }
+    },
+    "/ai/tickets/{id}/suggest-response": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "Suggest Response Draft",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "AI drafted agent reply" }
+        }
+      }
+    },
+    "/ai/tickets/{id}/summarize": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "Summarize Ticket Thread",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Text summary of comments" }
+        }
+      }
+    },
+    "/ai/resolution-guide": {
+      "post": {
+        "tags": ["AI Assistant"],
+        "summary": "Troubleshooting Resolution Guide",
+        "responses": {
+          "200": { "description": "Step-by-step resolution steps" }
+        }
+      }
+    },
+    "/analytics/summary": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Get Analytics Summary",
+        "responses": {
+          "200": { "description": "High level KPIs" }
+        }
+      }
+    },
+    "/analytics/trends": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Analytics Trends Data",
+        "responses": {
+          "200": { "description": "Historical volume trends" }
+        }
+      }
+    },
+    "/analytics/sla-compliance": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Historical SLA rates",
+        "responses": {
+          "200": { "description": "Detailed SLA stats" }
+        }
+      }
+    },
+    "/analytics/ticket-volume": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Volume breakdown",
+        "responses": {
+          "200": { "description": "Volume metrics" }
+        }
+      }
+    },
+    "/analytics/agent-leaderboard": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Historical Agent stats",
+        "responses": {
+          "200": { "description": "Leaderboard standings" }
+        }
+      }
+    },
+    "/analytics/heatmap": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Ticket Hourly Heatmap",
+        "responses": {
+          "200": { "description": "Heatmap matrix" }
+        }
+      }
+    },
+    "/reports/available": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "List downloadable report types",
+        "responses": {
+          "200": { "description": "Available formats and configurations" }
+        }
+      }
+    },
+    "/reports/tickets/pdf": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Download PDF Report",
+        "responses": {
+          "200": { "description": "PDF binary content", "content": { "application/pdf": {} } }
+        }
+      }
+    },
+    "/reports/tickets/csv": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Download CSV Export",
+        "responses": {
+          "200": { "description": "CSV textual stream", "content": { "text/csv": {} } }
+        }
+      }
+    },
+    "/reports/analytics/excel": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Download Excel Workbook",
+        "responses": {
+          "200": { "description": "Excel spreadsheet stream", "content": { "application/vnd.ms-excel": {} } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Pass your JWT token in the Authorization header: `Bearer <token>`"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 42 },
+          "email": { "type": "string", "example": "employee@intellidesk.ai" },
+          "first_name": { "type": "string", "example": "Demo" },
+          "last_name": { "type": "string", "example": "User" },
+          "role": { "type": "string", "example": "employee" },
+          "status": { "type": "string", "example": "active" }
+        }
+      },
+      "Ticket": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "ticket_number": { "type": "string", "example": "TKT-2026-0001" },
+          "title": { "type": "string", "example": "VPN connection issues" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "example": "open" },
+          "priority": { "type": "string", "example": "medium" },
+          "category": { "type": "string", "example": "Network" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Article": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "title": { "type": "string", "example": "VPN Setup Guide" },
+          "slug": { "type": "string", "example": "vpn-setup-guide" },
+          "body": { "type": "string" },
+          "status": { "type": "string", "example": "published" }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "success" },
+          "data": { "type": "object" }
+        }
+      }
+    }
+  }
+}

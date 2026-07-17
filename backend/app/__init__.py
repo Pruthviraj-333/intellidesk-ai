@@ -88,6 +88,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.controllers.report_controller import report_bp
     from app.controllers.ticket_controller import ticket_bp
     from app.controllers.user_controller import user_bp
+    from app.controllers.docs_controller import docs_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
@@ -103,6 +104,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(ai_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(report_bp)
+    app.register_blueprint(docs_bp)
 
     # All routes registered.
 
