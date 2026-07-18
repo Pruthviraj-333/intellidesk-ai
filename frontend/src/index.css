@@ -584,6 +584,37 @@ h1, h2, h3, h4, h5, h6 {
   gap: 1.5rem;
 }
 
+.dashboard-grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.dashboard-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dashboard-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid-3 {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+
 .stat-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);

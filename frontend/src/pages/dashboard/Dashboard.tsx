@@ -201,7 +201,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Row 1: Trend Line + SLA Bar */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' }}>
+          <div className="dashboard-grid-2">
             {/* Ticket Trend */}
             <div className="card">
               <div className="card-header"><h3 className="card-title">Ticket Volume Trend</h3></div>
@@ -240,7 +240,7 @@ export const Dashboard: React.FC = () => {
                 : <ResponsiveContainer width="100%" height={240}>
                     <BarChart data={sla} margin={{ top:8, right:8, bottom:0, left:0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
-                      <XAxis dataKey="priority" tick={{ fontSize:11, fill:'var(--text-muted)', textTransform:'capitalize' }} tickLine={false} axisLine={false} />
+                      <XAxis dataKey="priority" tick={{ fontSize:11, fill:'var(--text-muted)' }} tickFormatter={v => v ? v.charAt(0).toUpperCase() + v.slice(1) : ''} tickLine={false} axisLine={false} />
                       <YAxis domain={[0,100]} tickFormatter={v=>`${v}%`} tick={{ fontSize:10, fill:'var(--text-muted)' }} tickLine={false} axisLine={false} />
                       <Tooltip content={<CustomTooltip/>} />
                       <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize:'0.78rem' }} />
@@ -257,7 +257,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Row 2: Category Donut + Agent Leaderboard */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem' }}>
+          <div className="dashboard-grid-2">
             {/* Ticket Volume by Category */}
             <div className="card">
               <div className="card-header"><h3 className="card-title">Tickets by Category</h3></div>
@@ -266,7 +266,7 @@ export const Dashboard: React.FC = () => {
                 : <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie data={volume} dataKey="count" nameKey="category" cx="50%" cy="50%"
-                        innerRadius={55} outerRadius={85} paddingAngle={3} label={({ percent }) => `${(percent*100).toFixed(0)}%`}
+                        innerRadius={55} outerRadius={85} paddingAngle={3} label={({ percent }) => `${((percent || 0)*100).toFixed(0)}%`}
                         labelLine={true}>
                         {volume.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
@@ -319,7 +319,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* ── Bottom Grid: Tickets + Reports ── */}
-      <div style={{ display:'grid', gridTemplateColumns: isManager ? '2fr 1fr' : '1fr', gap:'1.5rem' }}>
+      <div className={isManager ? "dashboard-grid-3" : "dashboard-grid-1"}>
         {/* Recent Tickets */}
         <div className="card">
           <div className="card-header"><h3 className="card-title">Recent Tickets</h3></div>
