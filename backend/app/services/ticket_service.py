@@ -143,6 +143,25 @@ class TicketService:
                     resource_type="ticket",
                     resource_id=ticket.id,
                 )
+                if ticket.assignee and ticket.assignee.email:
+                    from app.services.email_service import EmailService
+                    EmailService.send_ticket_assigned_email(
+                        agent_email=ticket.assignee.email,
+                        agent_name=ticket.assignee.full_name,
+                        ticket_number=ticket.ticket_number,
+                        ticket_title=ticket.title,
+                    )
+
+        # Notify requester if ticket resolved
+        if "status" in data and data["status"] == TicketStatus.RESOLVED.value and old_values.get("status") != TicketStatus.RESOLVED.value:
+            if ticket.requester and ticket.requester.email:
+                from app.services.email_service import EmailService
+                EmailService.send_ticket_resolved_email(
+                    user_email=ticket.requester.email,
+                    user_name=ticket.requester.full_name,
+                    ticket_number=ticket.ticket_number,
+                    resolution_notes=ticket.resolution_notes or "Resolution provided.",
+                )
 
         AuditService.log(
             action=AuditAction.TICKET_UPDATED.value,
@@ -153,6 +172,7 @@ class TicketService:
             new_values=data,
         )
         return updated_ticket
+
 
     @staticmethod
     def get_ticket(

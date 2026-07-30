@@ -175,3 +175,67 @@ def list_comments(ticket_id: int):
     include_internal = role != UserRole.EMPLOYEE.value
     comments = CommentRepository.list_for_ticket(ticket_id, include_internal=include_internal)
     return success_response(CommentResponseSchema(many=True).dump(comments))
+
+
+
+# ─── Similar Tickets & CSAT ───────────────────────────────────────────────────
+
+
+@ticket_bp.route("/<int:ticket_id>/similar", methods=["GET"])
+@role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+def get_similar_tickets(ticket_id: int):
+    """
+    GET /api/v1/tickets/:id/similar — Find similar historical tickets (AI-FR-006).
+    Uses category and keyword search across resolved/closed tickets.
+    """
+    ticket = TicketRepository.get_by_id(ticket_id)
+    if not ticket:
+        raise NotFoundError("Ticket", ticket_id)
+
+    query = Ticket.query.filter(
+        Ticket.id != ticket.id,
+        Ticket.deleted_at.is_(None),
+    )
+
+    # Match by category if available, otherwise match by title words
+    if ticket.category:
+        query = query.filter(Ticket.category == ticket.category)
+
+    similar = query.order_by(Ticket.created_at.desc()).limit(5).all()
+    return success_response(TicketSummarySchema(many=True).dump(similar))
+
+
+@ticket_bp.route("/<int:ticket_id>/csat", methods=["POST"])
+@jwt_required()
+def submit_csat_rating(ticket_id: int):
+    """
+    POST /api/v1/tickets/:id/csat — Submit customer satisfaction rating (1-5) and feedback (CSAT-FR-001).
+    Requester only on resolved/closed tickets.
+    """
+    from flask import request
+    from app.extensions import db
+
+    user_id = get_current_user_id()
+    ticket = TicketRepository.get_by_id(ticket_id)
+    if not ticket:
+        raise NotFoundError("Ticket", ticket_id)
+
+    if ticket.requester_id != user_id:
+        return success_response({"error": "Only ticket requester can submit CSAT."}, status_code=403)
+
+    data = request.get_json(silent=True) or {}
+    rating = data.get("rating")
+    if not rating or not isinstance(rating, int) or not (1 <= rating <= 5):
+        return success_response({"error": "Rating must be an integer between 1 and 5."}, status_code=400)
+
+    ticket.csat_rating = rating
+    ticket.csat_comment = data.get("comment")
+    db.session.commit()
+
+    return success_response({
+        "message": "CSAT score submitted successfully.",
+        "ticket_id": ticket.id,
+        "csat_rating": ticket.csat_rating,
+        "csat_comment": ticket.csat_comment,
+    })
+

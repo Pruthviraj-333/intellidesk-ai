@@ -55,9 +55,14 @@ class Ticket(db.Model, TimestampMixin, SoftDeleteMixin):
     ai_department_suggestion = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True)
     ai_metadata = db.Column(db.JSON, default=dict, nullable=False)
 
+    # CSAT & Feedback
+    csat_rating = db.Column(db.Integer, nullable=True)  # 1 to 5
+    csat_comment = db.Column(db.Text, nullable=True)
+
     # Denormalized counters (avoid COUNT queries on hot paths)
     comment_count = db.Column(db.Integer, default=0, nullable=False)
     reopen_count = db.Column(db.Integer, default=0, nullable=False)
+
 
     # Relationships
     requester = db.relationship("User", foreign_keys=[requester_id], backref="requested_tickets")

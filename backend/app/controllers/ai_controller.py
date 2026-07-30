@@ -276,3 +276,58 @@ def get_resolution_guide(data: dict):
             "rag_context_used": bool(context),
         }
     )
+
+
+@ai_bp.route("/tickets/<int:ticket_id>/draft-email", methods=["POST"])
+@role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+def draft_ticket_email(ticket_id: int):
+    """
+    POST /api/v1/ai/tickets/:id/draft-email — Generate AI email draft (Agent+).
+    Query/Body option: email_type (status_update | escalation | resolution | follow_up)
+    """
+    from flask import request
+
+    ticket = TicketRepository.get_by_id(ticket_id)
+    if not ticket:
+        raise NotFoundError("Ticket", ticket_id)
+
+    body_data = request.get_json(silent=True) or {}
+    email_type = body_data.get("email_type", "status_update")
+
+    draft = LLMService.generate_ticket_email(
+        email_type=email_type,
+        ticket_title=ticket.title,
+        ticket_number=ticket.ticket_number,
+        requester_name=ticket.requester.full_name if ticket.requester else "Customer",
+        agent_name=ticket.assignee.full_name if ticket.assignee else "Support Team",
+        resolution_notes=ticket.resolution_notes or "",
+    )
+    return success_response(draft)
+
+
+@ai_bp.route("/tickets/<int:ticket_id>/action-items", methods=["POST"])
+@role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+def extract_ticket_action_items(ticket_id: int):
+    """
+    POST /api/v1/ai/tickets/:id/action-items — Extract structured action items from ticket comments (Agent+).
+    """
+    ticket = TicketRepository.get_by_id(ticket_id)
+    if not ticket:
+        raise NotFoundError("Ticket", ticket_id)
+
+    comments = [
+        {
+            "author": c.author.full_name if c.author else "Unknown",
+            "role": c.author.role.name if (c.author and c.author.role) else "User",
+            "body": c.body,
+            "created_at": c.created_at.isoformat() if c.created_at else "",
+        }
+        for c in ticket.comments
+    ]
+
+    action_items = LLMService.extract_action_items(
+        ticket_title=ticket.title,
+        comments=comments,
+    )
+    return success_response({"ticket_id": ticket.id, "action_items": action_items})
+

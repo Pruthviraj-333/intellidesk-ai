@@ -125,3 +125,23 @@ class AIClassification(db.Model):
 
     def __repr__(self) -> str:
         return f"<AIClassification ticket={self.ticket_id} [{self.predicted_priority}/{self.predicted_category}]>"
+
+
+class PromptTemplate(db.Model, TimestampMixin):
+    """
+    PromptTemplate model — manageable and versioned system prompts (AI-FR-004).
+    Allows admins to edit LLM prompt templates dynamically.
+    """
+
+    __tablename__ = "prompt_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False, index=True)  # e.g., 'classification', 'chat_system'
+    template_text = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<PromptTemplate {self.name}>"
+

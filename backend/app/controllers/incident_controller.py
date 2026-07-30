@@ -174,7 +174,37 @@ def add_timeline_entry(data: dict, incident_id: int):
     return created_response(IncidentTimelineSchema().dump(entry))
 
 
+@incident_bp.route("/<int:incident_id>/summarize", methods=["POST"])
+@role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+def summarize_incident(incident_id: int):
+    """POST /api/v1/incidents/:id/summarize — Generate AI incident executive summary (INC-FR-004)."""
+    from app.services.llm_service import LLMService
+
+    incident = IncidentRepository.get_by_id(incident_id)
+    if not incident:
+        raise NotFoundError("Incident", incident_id)
+
+    timeline_data = [
+        {
+            "event_type": t.event_type,
+            "description": t.description,
+            "created_at": t.created_at.isoformat() if t.created_at else "",
+        }
+        for t in incident.timeline
+    ]
+
+    summary = LLMService.summarize_incident(
+        incident_title=incident.title,
+        incident_description=incident.description,
+        severity=incident.severity,
+        affected_services=incident.affected_services or "",
+        timeline_events=timeline_data,
+    )
+    return success_response(summary)
+
+
 # ─── Problem Endpoints ────────────────────────────────────────────────────────
+
 
 
 @problem_bp.route("/", methods=["POST"])
@@ -231,6 +261,34 @@ def update_problem(data: dict, problem_id: int):
 
     problem = ProblemRepository.update(problem, data)
     return success_response(ProblemDetailSchema().dump(problem))
+
+
+@problem_bp.route("/<int:problem_id>/analyze-root-cause", methods=["POST"])
+@role_required(UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+def analyze_problem_root_cause(problem_id: int):
+    """POST /api/v1/problems/:id/analyze-root-cause — Run AI root cause analysis on problem (PRB-FR-002)."""
+    from app.services.llm_service import LLMService
+
+    problem = ProblemRepository.get_by_id(problem_id)
+    if not problem:
+        raise NotFoundError("Problem", problem_id)
+
+    linked_incidents = [
+        {
+            "incident_number": i.incident_number,
+            "title": i.title,
+            "severity": i.severity,
+        }
+        for i in problem.linked_incidents
+    ]
+
+    analysis = LLMService.analyze_root_cause(
+        problem_title=problem.title,
+        problem_description=problem.description,
+        linked_incidents=linked_incidents,
+    )
+    return success_response(analysis)
+
 
 
 # ─── Notification Endpoints ───────────────────────────────────────────────────

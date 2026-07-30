@@ -34,7 +34,10 @@
     { "name": "Documents", "description": "Upload, view, and reprocess uploaded attachments" },
     { "name": "AI Assistant", "description": "RAG chat assistant, ticket classification, and auto-suggested responses" },
     { "name": "Analytics", "description": "Platform performance metrics and trends" },
-    { "name": "Reports", "description": "Export data and download PDF/CSV reports" }
+    { "name": "Reports", "description": "Export data and download PDF/CSV reports" },
+    { "name": "System Administration", "description": "System settings, global configurations, and audit logs" },
+    { "name": "Projects", "description": "Project management for grouping helpdesk tickets" },
+    { "name": "Prompt Management", "description": "Dynamic prompt template management for LLM features" }
   ],
   "paths": {
     "/health": {

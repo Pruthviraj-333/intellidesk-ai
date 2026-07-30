@@ -1,6 +1,6 @@
 """IntelliDesk AI — Models Package (updated for M3)."""
 
-from app.models.ai import AIClassification, AIMessage, AISession
+from app.models.ai import AIClassification, AIMessage, AISession, PromptTemplate
 from app.models.analytics import AgentDailyMetric, DailyMetricSnapshot
 from app.models.base import SoftDeleteMixin, TimestampMixin
 from app.models.department import AuditLog, Department, Setting
@@ -57,6 +57,8 @@ __all__ = [
     "AISession",
     "AIMessage",
     "AIClassification",
+    "PromptTemplate",
     "DailyMetricSnapshot",
     "AgentDailyMetric",
 ]
+

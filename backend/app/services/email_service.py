@@ -121,3 +121,48 @@ class EmailService:
             subject="Reset your IntelliDesk AI password",
             html_body=html,
         )
+
+    @staticmethod
+    def send_ticket_assigned_email(agent_email: str, agent_name: str, ticket_number: str, ticket_title: str) -> bool:
+        """Notify agent when assigned to a ticket."""
+        html = f"""<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Ticket Assigned: {ticket_number}</h2>
+        <p>Hi {agent_name},</p>
+        <p>You have been assigned to ticket <strong>{ticket_number}</strong>: <em>{ticket_title}</em>.</p>
+        <p>Please log in to IntelliDesk AI to view details and respond.</p>
+        </div>"""
+        return EmailService._send(to=agent_email, subject=f"Assigned Ticket: {ticket_number}", html_body=html)
+
+    @staticmethod
+    def send_ticket_resolved_email(user_email: str, user_name: str, ticket_number: str, resolution_notes: str) -> bool:
+        """Notify requester when ticket is resolved."""
+        html = f"""<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Ticket Resolved: {ticket_number}</h2>
+        <p>Hi {user_name},</p>
+        <p>Your ticket <strong>{ticket_number}</strong> has been resolved.</p>
+        <p><strong>Resolution Notes:</strong> {resolution_notes}</p>
+        <p>If your issue persists, you may reopen this ticket from the portal.</p>
+        </div>"""
+        return EmailService._send(to=user_email, subject=f"Ticket Resolved: {ticket_number}", html_body=html)
+
+    @staticmethod
+    def send_sla_breach_email(manager_email: str, ticket_number: str, sla_due_at: str) -> bool:
+        """Send SLA breach warning/alert email to manager."""
+        html = f"""<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #dc2626;">SLA Breach Alert: {ticket_number}</h2>
+        <p>Ticket <strong>{ticket_number}</strong> has breached its SLA response/resolution deadline ({sla_due_at}).</p>
+        <p>Immediate manager intervention is requested.</p>
+        </div>"""
+        return EmailService._send(to=manager_email, subject=f"SLA BREACH ALERT: {ticket_number}", html_body=html)
+
+    @staticmethod
+    def send_incident_created_email(recipient_email: str, incident_number: str, title: str, severity: str) -> bool:
+        """Notify team when major incident is logged."""
+        html = f"""<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #b91c1c;">Major Incident Logged: {incident_number}</h2>
+        <p><strong>Title:</strong> {title}</p>
+        <p><strong>Severity:</strong> {severity}</p>
+        <p>Please check the incident command center.</p>
+        </div>"""
+        return EmailService._send(to=recipient_email, subject=f"INCIDENT ALERT [{severity.upper()}]: {incident_number}", html_body=html)
+

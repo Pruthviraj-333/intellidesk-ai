@@ -255,3 +255,219 @@ Keep steps clear and actionable. Include a final step to escalate if self-help f
             max_tokens=600,
         )
         return result["content"]
+
+    @staticmethod
+    def summarize_incident(
+        incident_title: str,
+        incident_description: str,
+        severity: str,
+        affected_services: str,
+        timeline_events: list[dict],
+    ) -> dict:
+        """
+        Generate an AI-powered executive summary for an incident.
+
+        Returns:
+            {executive_summary, timeline_summary, impact_analysis, action_items}
+        """
+        import json
+
+        timeline_text = "\n".join(
+            f"[{e.get('created_at', '')}] {e.get('event_type', '').upper()}: {e.get('description', '')}"
+            for e in timeline_events
+        ) or "No timeline events recorded."
+
+        prompt = f"""Analyze this IT incident and generate a structured executive summary.
+
+Incident: {incident_title}
+Severity: {severity}
+Affected Services: {affected_services or 'Not specified'}
+Description: {incident_description}
+
+Timeline:
+{timeline_text}
+
+Respond ONLY with valid JSON (no markdown):
+{{
+  "executive_summary": "<2-3 sentence executive summary>",
+  "timeline_summary": "<brief chronological narrative of what happened>",
+  "impact_analysis": "<what was affected and business impact>",
+  "action_items": ["<action 1>", "<action 2>", "<action 3>"]
+}}"""
+
+        messages = [
+            {"role": "system", "content": "You are a precise IT incident analyst. Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            result = LLMService.chat_completion(messages=messages, temperature=0.2, max_tokens=600)
+            return json.loads(result["content"].strip())
+        except Exception as e:
+            logger.error(f"Incident summarization failed: {e}")
+            return {
+                "executive_summary": "AI summary unavailable.",
+                "timeline_summary": "",
+                "impact_analysis": "",
+                "action_items": [],
+            }
+
+    @staticmethod
+    def generate_ticket_email(
+        email_type: str,
+        ticket_title: str,
+        ticket_number: str,
+        requester_name: str,
+        agent_name: str = "",
+        resolution_notes: str = "",
+    ) -> dict:
+        """
+        Generate a professional email draft for ticket events.
+
+        Args:
+            email_type: One of 'status_update', 'escalation', 'resolution', 'follow_up'
+        Returns:
+            {subject, body}
+        """
+        import json
+
+        context_map = {
+            "status_update": "A status update email informing the user of progress",
+            "escalation": "An escalation notice explaining why this ticket has been escalated to senior support",
+            "resolution": f"A resolution notification. Resolution notes: {resolution_notes}",
+            "follow_up": "A friendly follow-up checking if the user's issue is fully resolved",
+        }
+        email_context = context_map.get(email_type, "A professional support email")
+
+        prompt = f"""Write {email_context} for this IT support ticket.
+
+Ticket: {ticket_number} — {ticket_title}
+User: {requester_name}
+Agent: {agent_name or 'Support Team'}
+
+Return ONLY valid JSON:
+{{
+  "subject": "<professional email subject>",
+  "body": "<complete professional email body in plain text, with greeting and sign-off>"
+}}"""
+
+        messages = [
+            {"role": "system", "content": "You are a professional IT support email writer. Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            result = LLMService.chat_completion(messages=messages, temperature=0.5, max_tokens=400)
+            return json.loads(result["content"].strip())
+        except Exception as e:
+            logger.error(f"Email generation failed: {e}")
+            return {
+                "subject": f"Update on your ticket: {ticket_number}",
+                "body": f"Dear {requester_name},\n\nWe are writing regarding your ticket '{ticket_title}'.\n\nBest regards,\nSupport Team",
+            }
+
+    @staticmethod
+    def extract_action_items(
+        ticket_title: str,
+        comments: list[dict],
+        context: str = "",
+    ) -> list[dict]:
+        """
+        Extract structured action items from a ticket's comment thread.
+
+        Returns:
+            List of {action, suggested_assignee, priority, status}
+        """
+        import json
+
+        thread_text = "\n".join(
+            f"[{c.get('created_at', '')}] {c.get('author', '')} ({c.get('role', '')}): {c.get('body', '')}"
+            for c in comments
+        ) or "No comments."
+
+        prompt = f"""Extract all action items and tasks from this IT support ticket thread.
+
+Ticket: {ticket_title}
+
+Thread:
+{thread_text}
+
+Return ONLY valid JSON array (no markdown):
+[
+  {{
+    "action": "<clear action description>",
+    "suggested_assignee": "<role or person name if mentioned, else 'Unassigned'>",
+    "priority": "<high|medium|low>",
+    "status": "pending"
+  }}
+]
+
+If no action items found, return an empty array []."""
+
+        messages = [
+            {"role": "system", "content": "You are a precise IT operations analyst. Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            result = LLMService.chat_completion(messages=messages, temperature=0.2, max_tokens=500)
+            parsed = json.loads(result["content"].strip())
+            return parsed if isinstance(parsed, list) else []
+        except Exception as e:
+            logger.error(f"Action item extraction failed: {e}")
+            return []
+
+    @staticmethod
+    def analyze_root_cause(
+        problem_title: str,
+        problem_description: str,
+        linked_incidents: list[dict],
+        kb_context: str = "",
+    ) -> dict:
+        """
+        AI-powered root cause analysis for a Problem record.
+
+        Returns:
+            {root_cause_hypothesis, contributing_factors, remediation_steps, prevention_recommendations}
+        """
+        import json
+
+        incidents_text = "\n".join(
+            f"- [{i.get('incident_number', '')}] {i.get('title', '')} (Severity: {i.get('severity', '')})"
+            for i in linked_incidents
+        ) or "No linked incidents."
+
+        kb_section = f"\n\nKnowledge Base Context:\n{kb_context}" if kb_context else ""
+
+        prompt = f"""Perform a root cause analysis for this IT problem.
+
+Problem: {problem_title}
+Description: {problem_description}
+
+Linked Incidents:
+{incidents_text}{kb_section}
+
+Respond ONLY with valid JSON:
+{{
+  "root_cause_hypothesis": "<most likely root cause in 2-3 sentences>",
+  "contributing_factors": ["<factor 1>", "<factor 2>", "<factor 3>"],
+  "remediation_steps": ["<step 1>", "<step 2>", "<step 3>"],
+  "prevention_recommendations": ["<recommendation 1>", "<recommendation 2>"]
+}}"""
+
+        messages = [
+            {"role": "system", "content": "You are an expert IT root cause analyst. Return only valid JSON."},
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            result = LLMService.chat_completion(messages=messages, temperature=0.2, max_tokens=600)
+            return json.loads(result["content"].strip())
+        except Exception as e:
+            logger.error(f"Root cause analysis failed: {e}")
+            return {
+                "root_cause_hypothesis": "AI analysis unavailable.",
+                "contributing_factors": [],
+                "remediation_steps": [],
+                "prevention_recommendations": [],
+            }
