@@ -40,7 +40,37 @@ class LLMService:
 Your role is to help IT staff and employees resolve technical issues efficiently.
 You have access to the company's knowledge base and can provide step-by-step guidance.
 Always be professional, concise, and solution-focused.
-When you are unsure, acknowledge it and suggest escalating to a human agent."""
+
+### Ticket Creation — Agentic Mode
+You CAN help users raise IT support tickets by collecting the required details through natural conversation.
+
+**How ticket creation works:**
+1. When a user wants to report an issue or escalate, ask follow-up questions ONE AT A TIME to understand:
+   - A clear issue title
+   - A detailed description (device/system affected, when it started, scope/impact)
+   - Urgency (how much it is impacting work)
+2. Once you have enough detail (at minimum a clear title and description), say exactly:
+   **"I have all the details I need — I'm raising a ticket for you now."**
+3. The system backend WILL automatically create the real ticket at that moment.
+4. If the user later asks "did you create the ticket?" or "what is the ticket number?", tell them:
+   **"Yes, the ticket was raised successfully. You can view it and get the ticket number on the Tickets page from the left sidebar."**
+5. Do NOT say you cannot confirm or that you have no access — the ticket IS created when you signal it.
+
+### Critical Rules
+- NEVER fabricate ticket numbers — the system generates them.
+- NEVER say "I cannot confirm" after you have already said you're raising a ticket — it WAS created.
+- If you cannot gather enough detail after 3 questions, ask the user to go to the Tickets page directly.
+
+Always structure your answers with clean Markdown syntax:
+- Use clear line breaks between paragraphs and steps.
+- Put each step or list item on its own new line (e.g. 1. **Step name**: Description).
+- Use bold text for key terms or step headings.
+- Use section headers (e.g. ### Steps to Resolve) to group information logically.
+- Use inline code (`code`) or code blocks for commands and technical settings.
+
+When you are unsure about a technical solution, acknowledge it and suggest escalating to a human agent."""
+
+
 
     @staticmethod
     def chat_completion(
@@ -97,6 +127,112 @@ When you are unsure, acknowledge it and suggest escalating to a human agent."""
 
         logger.error(f"All LLM models failed. Last error: {last_error}")
         raise RuntimeError(f"LLM service unavailable: {last_error}")
+
+    @staticmethod
+    def extract_ticket_intent(
+        conversation_history: list[dict],
+        force: bool = False,
+    ) -> Optional[dict]:
+        """
+        Analyse the conversation history to detect ticket creation intent and extract fields.
+
+        Args:
+            conversation_history: List of {role, content} message dicts.
+            force: If True, skip the explicit-intent requirement — used when the AI has
+                   already signalled it is raising a ticket. Just extract the fields.
+
+        Returns:
+            None — if not ready (intent absent or missing required fields)
+            dict — {title, description, priority, category}
+        """
+        import json
+
+        # Build a compact conversation summary for the classifier
+        convo_text = "\n".join(
+            f"{m['role'].upper()}: {m['content']}"
+            for m in conversation_history[-14:]  # last 14 messages for full context
+        )
+
+        if force:
+            # The AI has already decided to raise a ticket — just extract the fields
+            prompt = f"""An IT support assistant has decided to raise a ticket based on this conversation.
+Extract the ticket fields from the conversation.
+
+Conversation:
+{convo_text}
+
+Rules:
+- Extract realistic values only from what was discussed — do not invent details.
+- Combine all issue details into a comprehensive description.
+- priority must be one of: critical, high, medium, low (infer from impact described)
+- category must be one of: Hardware, Software, Network, Access/Permissions, Email, Database, Security, General
+
+Respond ONLY with this JSON (no markdown, no explanation):
+{{
+  "ready": true,
+  "title": "<short descriptive ticket title>",
+  "description": "<detailed description summarising the issue from the conversation>",
+  "priority": "<critical|high|medium|low>",
+  "category": "<one of the allowed categories>"
+}}"""
+        else:
+            # Standard mode — require explicit user intent
+            prompt = f"""Review this IT support conversation and determine if a support ticket should be created.
+
+Conversation:
+{convo_text}
+
+Rules:
+- Only return ready=true if the user explicitly wants to create/raise/escalate a ticket AND you can extract a clear title and description.
+- If the user is just asking for help (not requesting ticket creation), return ready=false.
+- Extract realistic values only from what the user actually said — do not invent details.
+- priority must be one of: critical, high, medium, low
+- category must be one of: Hardware, Software, Network, Access/Permissions, Email, Database, Security, General
+
+Respond ONLY with this JSON (no markdown, no explanation):
+{{
+  "ready": <true or false>,
+  "title": "<short descriptive ticket title or null>",
+  "description": "<detailed description from conversation or null>",
+  "priority": "<critical|high|medium|low>",
+  "category": "<one of the allowed categories>"
+}}"""
+
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a precise IT ticket intent classifier. Return only valid JSON.",
+            },
+            {"role": "user", "content": prompt},
+        ]
+
+        try:
+            result = LLMService.chat_completion(
+                messages=messages,
+                temperature=0.1,
+                max_tokens=300,
+                use_fallback=True,
+            )
+            raw = result["content"].strip()
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            raw = raw.strip()
+            parsed = json.loads(raw)
+            if parsed.get("ready") and parsed.get("title") and parsed.get("description"):
+                return {
+                    "title": parsed["title"],
+                    "description": parsed["description"],
+                    "priority": parsed.get("priority", "medium"),
+                    "category": parsed.get("category", "General"),
+                }
+            return None
+        except Exception as e:
+            logger.warning(f"extract_ticket_intent failed: {e}")
+            return None
+
 
     @staticmethod
     def classify_ticket(ticket_title: str, ticket_description: str) -> dict:

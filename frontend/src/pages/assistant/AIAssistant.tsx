@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { FormattedMarkdown } from '../../components/common/FormattedMarkdown';
 import { 
   Plus, 
   Trash2, 
@@ -15,8 +16,11 @@ import {
   ThumbsUp,
   ThumbsDown,
   Loader2,
-  FileText
+  FileText,
+  TicketCheck,
+  ExternalLink
 } from 'lucide-react';
+
 
 interface ChatSession {
   session_uuid: string;
@@ -31,6 +35,14 @@ interface ChatMessage {
   rag_sources?: any[];
   latency_ms?: number;
   tokens_used?: number;
+  ticket_created?: {
+    id: number;
+    ticket_number: string;
+    title: string;
+    priority: string;
+    category: string;
+    status: string;
+  } | null;
 }
 
 export const AIAssistant: React.FC = () => {
@@ -140,10 +152,6 @@ export const AIAssistant: React.FC = () => {
       });
 
       const data = response.data.data;
-      if (!activeSessionUuid && data.session_uuid) {
-        setActiveSessionUuid(data.session_uuid);
-        fetchSessions();
-      }
 
       // Add assistant response
       const assistantMsg: ChatMessage = {
@@ -152,14 +160,35 @@ export const AIAssistant: React.FC = () => {
         content: data.response,
         rag_sources: data.sources,
         latency_ms: data.latency_ms,
-        tokens_used: data.tokens_used
+        tokens_used: data.tokens_used,
+        ticket_created: data.ticket_created || null
       };
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (err) {
-      console.error(err);
+
+      // If a new session was created, refresh sidebar
+      if (!activeSessionUuid && data.session_uuid) {
+        setActiveSessionUuid(data.session_uuid);
+        fetchSessions();
+      }
+    } catch (err: any) {
+      console.error('AI Chat Error:', err.response?.data || err);
+      const errorObj = err.response?.data?.error;
+      let detailText = '';
+      if (errorObj?.details && Array.isArray(errorObj.details) && errorObj.details.length > 0) {
+        detailText = errorObj.details.map((d: any) => `${d.field}: ${d.message}`).join('; ');
+      } else {
+        detailText = errorObj?.message || err.response?.data?.message || 'Failed to get response from AI Assistant.';
+      }
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender_type: 'assistant',
+        content: `⚠️ Error: ${detailText}`
+      }]);
     } finally {
       setIsLoading(false);
     }
+
+
   };
 
   // Ticket Assistant helper triggers
@@ -303,7 +332,12 @@ export const AIAssistant: React.FC = () => {
                 </div>
                 
                 <div className={`message-bubble message-${msg.sender_type}`}>
-                  {msg.content}
+                  {msg.sender_type === 'assistant' ? (
+                    <FormattedMarkdown content={msg.content} />
+                  ) : (
+                    msg.content
+                  )}
+
 
                   {/* RAG sources indicator */}
                   {msg.sender_type === 'assistant' && msg.rag_sources && msg.rag_sources.length > 0 && (
@@ -332,6 +366,33 @@ export const AIAssistant: React.FC = () => {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Agentic Ticket Created Card */}
+                  {msg.sender_type === 'assistant' && msg.ticket_created && (
+                    <div className="ticket-created-card">
+                      <div className="ticket-created-header">
+                        <TicketCheck size={16} />
+                        <span>Ticket Created Successfully</span>
+                      </div>
+                      <div className="ticket-created-body">
+                        <div className="ticket-created-number">{msg.ticket_created.ticket_number}</div>
+                        <div className="ticket-created-title">{msg.ticket_created.title}</div>
+                        <div className="ticket-created-meta">
+                          <span className={`badge badge-${msg.ticket_created.priority === 'critical' ? 'danger' : msg.ticket_created.priority === 'high' ? 'warning' : 'info'}`}>
+                            {msg.ticket_created.priority}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{msg.ticket_created.category}</span>
+                        </div>
+                      </div>
+                      <a
+                        href={`/tickets/${msg.ticket_created.id}`}
+                        className="ticket-created-link"
+                      >
+                        <ExternalLink size={13} />
+                        View Ticket
+                      </a>
                     </div>
                   )}
                 </div>

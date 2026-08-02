@@ -170,6 +170,82 @@ class AIChatService:
         session.total_tokens_used += total_tokens
         db.session.commit()
 
+        # 10. Agentic Ticket Creation — run intent detector on full conversation
+        # Signal phrases the AI uses when it has gathered enough info to raise a ticket
+        TICKET_SIGNAL_PHRASES = [
+            "i'm raising a ticket for you now",
+            "i am raising a ticket for you now",
+            "raising a ticket for you now",
+            "i have all the details i need",
+            "i'll raise a ticket",
+            "i will raise a ticket",
+            "creating a ticket for you",
+            "i've raised a ticket",
+            "i have raised a ticket",
+            "ticket has been raised",
+        ]
+
+        ticket_created_meta = None
+        try:
+            full_history = AIChatService._build_history(session)
+            response_lower = response_text.lower()
+
+            # DB-backed duplicate prevention: check if any PREVIOUS assistant messages
+            # already contained a signal phrase (means ticket was already created earlier)
+            # full_history[-2:] are the current user+assistant messages just committed
+            earlier_messages = full_history[:-2] if len(full_history) >= 2 else []
+            already_signalled_before = any(
+                any(phrase in m["content"].lower() for phrase in TICKET_SIGNAL_PHRASES)
+                for m in earlier_messages
+                if m["role"] == "assistant"
+            )
+
+            if already_signalled_before:
+                logger.info(
+                    f"Skipping ticket creation — already signalled in earlier message "
+                    f"for session={session.session_uuid}"
+                )
+            else:
+                # Check if current AI response signals readiness to raise ticket
+                ai_signalled = any(phrase in response_lower for phrase in TICKET_SIGNAL_PHRASES)
+
+                if ai_signalled:
+                    # Force mode: AI signalled readiness — extract fields from conversation
+                    logger.info(
+                        f"AI ticket signal detected for session={session.session_uuid}, "
+                        f"forcing field extraction"
+                    )
+                    ticket_fields = LLMService.extract_ticket_intent(full_history, force=True)
+                else:
+                    # Standard mode: detect explicit user intent ("please create a ticket")
+                    ticket_fields = LLMService.extract_ticket_intent(full_history, force=False)
+
+                if ticket_fields:
+                    from app.services.ticket_service import TicketService
+                    new_ticket = TicketService.create_ticket(
+                        title=ticket_fields["title"],
+                        description=ticket_fields["description"],
+                        requester_id=user_id,
+                        priority=ticket_fields.get("priority"),
+                        category=ticket_fields.get("category"),
+                    )
+                    ticket_created_meta = {
+                        "id": new_ticket.id,
+                        "ticket_number": new_ticket.ticket_number,
+                        "title": new_ticket.title,
+                        "priority": new_ticket.priority,
+                        "category": new_ticket.category,
+                        "status": new_ticket.status,
+                    }
+                    logger.info(
+                        f"Agentic ticket created: {new_ticket.ticket_number} "
+                        f"session={session.session_uuid} user={user_id} force={ai_signalled}"
+                    )
+        except Exception as e:
+            logger.error(f"Agentic ticket creation failed: {e}")
+
+
+
         logger.info(
             f"AI chat: session={session.session_uuid} tokens={total_tokens} "
             f"latency={llm_result['latency_ms']}ms rag_hits={len(rag_results)}"
@@ -183,7 +259,9 @@ class AIChatService:
             "model": llm_result["model"],
             "tokens_used": total_tokens,
             "latency_ms": llm_result["latency_ms"],
+            "ticket_created": ticket_created_meta,
         }
+
 
     @staticmethod
     def _build_history(session: AISession) -> list[dict]:

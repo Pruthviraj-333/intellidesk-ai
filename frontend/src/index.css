@@ -516,12 +516,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .message-bubble {
-  max-width: 75%;
-  padding: 1rem 1.25rem;
+  max-width: 85%;
+  padding: 1.15rem 1.4rem;
   border-radius: var(--radius-md);
-  line-height: 1.5;
+  line-height: 1.6;
   font-size: 0.95rem;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .message-user {
@@ -540,6 +541,80 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-sm);
 }
 
+/* Formatted Markdown Styles */
+.formatted-markdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  white-space: normal;
+}
+
+.formatted-markdown p.markdown-paragraph {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.formatted-markdown h2.markdown-h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.formatted-markdown h3.markdown-h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+  margin-bottom: 0.2rem;
+  color: var(--text-primary);
+}
+
+.formatted-markdown h4.markdown-h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-top: 0.3rem;
+  margin-bottom: 0.15rem;
+  color: var(--primary);
+}
+
+.formatted-markdown .markdown-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+  line-height: 1.5;
+}
+
+.formatted-markdown .markdown-list-prefix {
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.formatted-markdown .markdown-list-text {
+  flex: 1;
+}
+
+.formatted-markdown code.inline-code {
+  background-color: var(--bg-tertiary);
+  color: var(--primary);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.88rem;
+  border: 1px solid var(--border-color);
+}
+
+.formatted-markdown blockquote.markdown-blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 0.75rem;
+  margin: 0.25rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+
 .chat-input-area {
   padding: 1.5rem 2rem;
   background-color: var(--bg-secondary);
@@ -547,6 +622,76 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   gap: 1rem;
 }
+
+/* Agentic Ticket Created Confirmation Card */
+.ticket-created-card {
+  margin-top: 1rem;
+  border: 1px solid var(--success);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-color: var(--success-light);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ticket-created-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background-color: var(--success);
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.ticket-created-body {
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ticket-created-number {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success);
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.ticket-created-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ticket-created-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.ticket-created-link {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--success);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+  margin: 0 1rem 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.2s;
+}
+
+.ticket-created-link:hover {
+  opacity: 0.85;
+}
+
 
 /* RAG Sources Accordion / Card */
 .sources-toggle {

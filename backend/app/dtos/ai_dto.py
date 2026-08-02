@@ -37,10 +37,12 @@ class ChatSessionSchema(Schema):
 class ChatRequestSchema(Schema):
     """Incoming chat request from user."""
 
-    query = fields.Str(required=True, validate=validate.Length(min=3, max=2000))
-    session_uuid = fields.Str(load_default=None)
-    ticket_id = fields.Int(load_default=None)
+    query = fields.Str(required=True, validate=validate.Length(min=1, max=2000))
+    session_uuid = fields.Str(load_default=None, allow_none=True)
+    ticket_id = fields.Int(load_default=None, allow_none=True)
     n_rag_results = fields.Int(load_default=4, validate=validate.Range(min=1, max=10))
+
+
 
 
 class ChatResponseSchema(Schema):
@@ -53,6 +55,8 @@ class ChatResponseSchema(Schema):
     model = fields.Str(dump_only=True)
     tokens_used = fields.Int(dump_only=True)
     latency_ms = fields.Int(dump_only=True)
+    ticket_created = fields.Dict(dump_only=True, allow_none=True)
+
 
 
 class SessionListQuerySchema(Schema):
