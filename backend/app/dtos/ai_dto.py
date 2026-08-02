@@ -18,7 +18,9 @@ class ChatMessageSchema(Schema):
     rag_sources = fields.List(fields.Dict(), dump_only=True)
     model_used = fields.Str(dump_only=True, allow_none=True)
     latency_ms = fields.Int(dump_only=True, allow_none=True)
+    ticket_created = fields.Dict(dump_only=True, allow_none=True)
     created_at = fields.DateTime(dump_only=True)
+
 
 
 class ChatSessionSchema(Schema):

@@ -65,6 +65,8 @@ class AIMessage(db.Model):
     rag_sources = db.Column(db.JSON, default=list, nullable=False)
     model_used = db.Column(db.String(100), nullable=True)
     latency_ms = db.Column(db.Integer, nullable=True)  # Response time tracking
+    ticket_created = db.Column(db.JSON, nullable=True)  # Agentic ticket metadata if created
+
 
     created_at = db.Column(
         db.DateTime(timezone=True),

@@ -237,7 +237,10 @@ class AIChatService:
                         "category": new_ticket.category,
                         "status": new_ticket.status,
                     }
+                    assistant_msg.ticket_created = ticket_created_meta
+                    db.session.commit()
                     logger.info(
+
                         f"Agentic ticket created: {new_ticket.ticket_number} "
                         f"session={session.session_uuid} user={user_id} force={ai_signalled}"
                     )

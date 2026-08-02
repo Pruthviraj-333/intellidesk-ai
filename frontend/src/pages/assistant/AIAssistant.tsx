@@ -103,8 +103,10 @@ export const AIAssistant: React.FC = () => {
         content: m.content,
         rag_sources: m.rag_sources,
         latency_ms: m.latency_ms,
-        tokens_used: m.tokens_used
+        tokens_used: m.tokens_used,
+        ticket_created: m.ticket_created
       }));
+
       setMessages(formatted);
     } catch (e) {
       console.error(e);
