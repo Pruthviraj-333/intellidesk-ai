@@ -94,8 +94,8 @@ When you are unsure about a technical solution, acknowledge it and suggest escal
             {content, model, prompt_tokens, completion_tokens, latency_ms}
         """
         client = get_groq_client()
-        primary_model = model or current_app.config.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-        fallback_model = current_app.config.get("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+        primary_model = model or current_app.config.get("GROQ_MODEL", "qwen/qwen3.8-27b")
+        fallback_model = current_app.config.get("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
 
         models_to_try = [primary_model]
         if use_fallback and primary_model != fallback_model:
@@ -126,6 +126,82 @@ When you are unsure about a technical solution, acknowledge it and suggest escal
                 continue
 
         logger.error(f"All LLM models failed. Last error: {last_error}")
+        raise RuntimeError(f"LLM service unavailable: {last_error}")
+
+    @staticmethod
+    def chat_completion_stream(
+        messages: list[dict],
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+    ):
+        """
+        Stream a chat completion from Groq, yielding text chunks as they arrive.
+
+        This is a generator that yields dicts:
+            {"chunk": "<text>"}          — for each token chunk
+            {"done": True, "model": ..., "prompt_tokens": ...,
+             "completion_tokens": ..., "latency_ms": ...}  — final metadata
+
+        Falls back to the non-streaming fallback model on initial connection error.
+        """
+        client = get_groq_client()
+        primary_model = model or current_app.config.get("GROQ_MODEL", "qwen/qwen3.8-27b")
+        fallback_model = current_app.config.get("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
+
+        models_to_try = [primary_model]
+        if primary_model != fallback_model:
+            models_to_try.append(fallback_model)
+
+        last_error = None
+        for attempt_model in models_to_try:
+            try:
+                import time
+                t0 = time.monotonic()
+                completion_tokens = 0
+
+                with client.chat.completions.create(
+                    model=attempt_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                ) as stream:
+                    # Yield the chosen model name first so the caller knows which model is running
+                    yield {"model": attempt_model}
+
+                    for chunk in stream:
+                        delta = chunk.choices[0].delta
+                        if delta is not None and delta.content is not None and delta.content != "":
+                            completion_tokens += 1
+                            yield {"chunk": delta.content}
+
+                    latency_ms = int((time.monotonic() - t0) * 1000)
+
+                    # Groq streaming doesn't expose prompt tokens per chunk;
+                    # we approximate from the stream usage if available
+                    usage = getattr(stream, "usage", None) or getattr(
+                        chunk, "x_groq", None
+                    )
+                    prompt_tokens = 0
+                    if usage and hasattr(usage, "prompt_tokens"):
+                        prompt_tokens = usage.prompt_tokens or 0
+
+                    yield {
+                        "done": True,
+                        "model": attempt_model,
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "latency_ms": latency_ms,
+                    }
+                    return  # success — stop trying fallback
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Streaming LLM call failed with model '{attempt_model}': {e}")
+                continue
+
+        logger.error(f"All streaming LLM models failed. Last error: {last_error}")
         raise RuntimeError(f"LLM service unavailable: {last_error}")
 
     @staticmethod

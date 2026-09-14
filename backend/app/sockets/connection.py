@@ -12,6 +12,11 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# ── sid → user_id registry ────────────────────────────────────────────────────
+# Populated on connect, cleared on disconnect.
+# Used by ai_socket.py to authenticate streaming events without re-decoding JWT.
+_sid_user_map: dict[str, int] = {}
+
 
 @socketio.on("connect")
 def handle_connect(auth):
@@ -26,6 +31,8 @@ def handle_connect(auth):
     if auth and isinstance(auth, dict):
         token = auth.get("token")
 
+    logger.info(f"WebSocket connect attempt: sid={request.sid} has_token={bool(token)}")
+
     if not token:
         logger.warning("WebSocket connection rejected — no token provided")
         disconnect()
@@ -36,13 +43,21 @@ def handle_connect(auth):
         user_id = decoded.get("sub")
         role = decoded.get("role", "employee")
 
+        logger.info(f"WebSocket token decoded: user_id={user_id} type={type(user_id).__name__} role={role}")
+
+        # Ensure user_id is an integer (JWT sub may come back as string)
+        user_id = int(user_id)
+
         # Join personal notification room
         join_room(f"user:{user_id}")
 
         # Join role-wide room for broadcast updates
         join_room(f"role:{role}")
 
-        logger.info(f"WebSocket connected: user={user_id} sid={request.sid}")
+        # Register sid for fast auth lookup in streaming handlers
+        _sid_user_map[request.sid] = user_id
+
+        logger.info(f"WebSocket connected: user={user_id} sid={request.sid} map_size={len(_sid_user_map)}")
         emit(
             "connected",
             {
@@ -53,7 +68,8 @@ def handle_connect(auth):
         )
 
     except Exception as e:
-        logger.warning(f"WebSocket connection rejected — invalid token: {e}")
+        import traceback
+        logger.warning(f"WebSocket connection rejected — invalid token: {e}\n{traceback.format_exc()}")
         disconnect()
         return False
 
@@ -61,6 +77,7 @@ def handle_connect(auth):
 @socketio.on("disconnect")
 def handle_disconnect():
     """Handle WebSocket client disconnection."""
+    _sid_user_map.pop(request.sid, None)
     logger.info(f"WebSocket disconnected: sid={request.sid}")
 
 

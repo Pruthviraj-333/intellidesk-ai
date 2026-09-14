@@ -56,7 +56,8 @@ class BaseConfig:
 
     # ─── CORS ───────────────────────────────────────────────────────────────────
     CORS_ORIGINS: list = os.environ.get(
-        "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:3000,http://localhost:8000,http://localhost"
     ).split(",")
 
     # ─── ChromaDB ───────────────────────────────────────────────────────────────
@@ -66,8 +67,8 @@ class BaseConfig:
     # ─── AI (Groq) ──────────────────────────────────────────────────────────────
     LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "groq")
     GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
-    GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-    GROQ_FALLBACK_MODEL: str = os.environ.get("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b")
+    GROQ_FALLBACK_MODEL: str = os.environ.get("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
     EMBEDDING_MODEL: str = os.environ.get(
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )

@@ -16,6 +16,9 @@ logger = get_logger(__name__)
 # Embedding model singleton — loaded once per process to avoid cold-start delay
 _embedding_model = None
 
+# ChromaDB client singleton — one persistent HTTP connection per process
+_chroma_client = None
+
 
 def get_embedding_model():
     """
@@ -34,12 +37,16 @@ def get_embedding_model():
 
 
 def get_chroma_client():
-    """Get ChromaDB HTTP client connected to the configured server."""
-    import chromadb
+    """Get (or create) singleton ChromaDB HTTP client."""
+    global _chroma_client
+    if _chroma_client is None:
+        import chromadb
 
-    host = current_app.config.get("CHROMA_HOST", "localhost")
-    port = current_app.config.get("CHROMA_PORT", 8001)
-    return chromadb.HttpClient(host=host, port=int(port))
+        host = current_app.config.get("CHROMA_HOST", "localhost")
+        port = current_app.config.get("CHROMA_PORT", 8001)
+        _chroma_client = chromadb.HttpClient(host=host, port=int(port))
+        logger.info(f"ChromaDB client connected: {host}:{port}")
+    return _chroma_client
 
 
 class RAGService:

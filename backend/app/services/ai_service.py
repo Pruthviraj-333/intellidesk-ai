@@ -98,9 +98,17 @@ class AIChatService:
             session.title = query[:100]
             db.session.commit()
 
-        # 3. RAG retrieval — find relevant context chunks
+        # 3. RAG retrieval — single search call, reuse results for context string
         rag_results = RAGService.semantic_search(query=query, n_results=n_rag_results)
-        context = RAGService.build_context_for_query(query=query, n_results=n_rag_results)
+        if rag_results:
+            context_parts = []
+            for i, r in enumerate(rag_results):
+                meta = r["metadata"]
+                label = meta.get("title") or meta.get("file_name") or "Knowledge Base"
+                context_parts.append(f"[Source {i+1}: {label} (score: {r['score']})]\n{r['content']}")
+            context = "\n\n---\n\n".join(context_parts)
+        else:
+            context = ""
 
         # 4. Build conversation history for multi-turn context
         history = AIChatService._build_history(session)
@@ -264,6 +272,238 @@ class AIChatService:
             "latency_ms": llm_result["latency_ms"],
             "ticket_created": ticket_created_meta,
         }
+
+    @staticmethod
+    def chat_stream(
+        user_id: int,
+        query: str,
+        sid: str,
+        app=None,
+        session_uuid: Optional[str] = None,
+        ticket_id: Optional[int] = None,
+        n_rag_results: int = 4,
+    ) -> None:
+        """
+        Streaming variant of chat(). Runs the same RAG → LLM pipeline but
+        emits tokens to the caller's SocketIO room as they arrive.
+
+        IMPORTANT: Must receive the Flask `app` object and push its context
+        manually because this runs in an eventlet background greenlet that
+        does NOT inherit the request's app context.
+
+        SocketIO events emitted to room f"user:{user_id}":
+            ai:stream:start  — {"session_uuid": ..., "session_title": ...}
+            ai:stream:chunk  — {"chunk": "<token text>"}
+            ai:stream:done   — {session_uuid, model, tokens_used, latency_ms,
+                                sources, ticket_created}
+            ai:stream:error  — {"message": "<error text>"}
+        """
+        from app.extensions import socketio
+        room = f"user:{user_id}"
+
+        # Push Flask app context for this greenlet
+        ctx = app.app_context() if app else None
+        if ctx:
+            ctx.push()
+
+        try:
+            # 1. Get or create session
+            session = AIChatService.get_or_create_session(
+                user_id=user_id,
+                session_uuid=session_uuid,
+                ticket_id=ticket_id,
+            )
+
+            # 2. Auto-title from first message
+            if session.message_count == 0:
+                session.title = query[:100]
+                db.session.commit()
+
+            # 3. RAG retrieval — single search call, reuse results for context string
+            rag_results = RAGService.semantic_search(query=query, n_results=n_rag_results)
+            # Build context inline from the already-fetched results (avoids a second ChromaDB call)
+            if rag_results:
+                context_parts = []
+                for i, r in enumerate(rag_results):
+                    meta = r["metadata"]
+                    label = meta.get("title") or meta.get("file_name") or "Knowledge Base"
+                    context_parts.append(f"[Source {i+1}: {label} (score: {r['score']})]\n{r['content']}")
+                context = "\n\n---\n\n".join(context_parts)
+            else:
+                context = ""
+
+            # 4. Build conversation history
+            history = AIChatService._build_history(session)
+
+            # 5. Assemble messages
+            messages = [{"role": "system", "content": LLMService.SYSTEM_PROMPT}]
+            if context:
+                messages.append({
+                    "role": "system",
+                    "content": f"Use the following knowledge base context to answer the user's question:\n\n{context}",
+                })
+            messages.extend(history)
+            messages.append({"role": "user", "content": query})
+
+            # 6. Notify client stream is starting
+            socketio.emit("ai:stream:start", {
+                "session_uuid": session.session_uuid,
+                "session_title": session.title,
+            }, to=room)
+
+            # 7. Stream LLM response token by token
+            response_chunks = []
+            model_used = None
+            prompt_tokens = 0
+            completion_tokens = 0
+            latency_ms = 0
+
+            for item in LLMService.chat_completion_stream(
+                messages=messages,
+                temperature=0.6,
+                max_tokens=1024,
+            ):
+                if "model" in item and not item.get("done"):
+                    # First yield — model name confirmed
+                    model_used = item["model"]
+
+                elif "chunk" in item:
+                    # Token chunk — emit immediately
+                    chunk_text = item["chunk"]
+                    response_chunks.append(chunk_text)
+                    socketio.emit("ai:stream:chunk", {"chunk": chunk_text}, to=room)
+
+                elif item.get("done"):
+                    # Stream finished — collect metadata
+                    model_used = item.get("model", model_used)
+                    prompt_tokens = item.get("prompt_tokens", 0)
+                    completion_tokens = item.get("completion_tokens", len(response_chunks))
+                    latency_ms = item.get("latency_ms", 0)
+
+            response_text = "".join(response_chunks)
+            total_tokens = prompt_tokens + completion_tokens
+
+            # 8. Persist user message
+            user_msg = AIMessage(
+                session_id=session.id,
+                role="user",
+                content=query,
+                tokens_used=prompt_tokens,
+                model_used=model_used,
+            )
+            db.session.add(user_msg)
+
+            # 9. Persist assistant response with RAG sources
+            rag_source_meta = [
+                {
+                    "content_preview": r["content"][:150],
+                    "score": r["score"],
+                    "collection": r["collection"],
+                    "metadata": r["metadata"],
+                }
+                for r in rag_results
+            ]
+            assistant_msg = AIMessage(
+                session_id=session.id,
+                role="assistant",
+                content=response_text,
+                tokens_used=completion_tokens,
+                rag_sources=rag_source_meta,
+                model_used=model_used,
+                latency_ms=latency_ms,
+            )
+            db.session.add(assistant_msg)
+
+            # 10. Update session counters
+            session.message_count += 2
+            session.total_tokens_used += total_tokens
+            db.session.commit()
+
+            # 11. Agentic Ticket Creation (same logic as chat())
+            TICKET_SIGNAL_PHRASES = [
+                "i'm raising a ticket for you now",
+                "i am raising a ticket for you now",
+                "raising a ticket for you now",
+                "i have all the details i need",
+                "i'll raise a ticket",
+                "i will raise a ticket",
+                "creating a ticket for you",
+                "i've raised a ticket",
+                "i have raised a ticket",
+                "ticket has been raised",
+            ]
+
+            ticket_created_meta = None
+            try:
+                full_history = AIChatService._build_history(session)
+                response_lower = response_text.lower()
+                earlier_messages = full_history[:-2] if len(full_history) >= 2 else []
+                already_signalled_before = any(
+                    any(phrase in m["content"].lower() for phrase in TICKET_SIGNAL_PHRASES)
+                    for m in earlier_messages
+                    if m["role"] == "assistant"
+                )
+
+                if not already_signalled_before:
+                    ai_signalled = any(phrase in response_lower for phrase in TICKET_SIGNAL_PHRASES)
+                    if ai_signalled:
+                        ticket_fields = LLMService.extract_ticket_intent(full_history, force=True)
+                    else:
+                        ticket_fields = LLMService.extract_ticket_intent(full_history, force=False)
+
+                    if ticket_fields:
+                        from app.services.ticket_service import TicketService
+                        new_ticket = TicketService.create_ticket(
+                            title=ticket_fields["title"],
+                            description=ticket_fields["description"],
+                            requester_id=user_id,
+                            priority=ticket_fields.get("priority"),
+                            category=ticket_fields.get("category"),
+                        )
+                        ticket_created_meta = {
+                            "id": new_ticket.id,
+                            "ticket_number": new_ticket.ticket_number,
+                            "title": new_ticket.title,
+                            "priority": new_ticket.priority,
+                            "category": new_ticket.category,
+                            "status": new_ticket.status,
+                        }
+                        assistant_msg.ticket_created = ticket_created_meta
+                        db.session.commit()
+                        logger.info(
+                            f"Agentic ticket created (stream): {new_ticket.ticket_number} "
+                            f"session={session.session_uuid} user={user_id}"
+                        )
+            except Exception as e:
+                logger.error(f"Agentic ticket creation failed (stream): {e}")
+
+            logger.info(
+                f"AI stream: session={session.session_uuid} tokens={total_tokens} "
+                f"latency={latency_ms}ms rag_hits={len(rag_results)}"
+            )
+
+            # 12. Emit completion event with full metadata
+            socketio.emit("ai:stream:done", {
+                "session_uuid": session.session_uuid,
+                "session_title": session.title,
+                "model": model_used,
+                "tokens_used": total_tokens,
+                "latency_ms": latency_ms,
+                "sources": rag_source_meta,
+                "ticket_created": ticket_created_meta,
+            }, to=room)
+
+        except Exception as e:
+            import traceback
+            logger.error(f"chat_stream failed for user={user_id}: {e}\n{traceback.format_exc()}")
+            try:
+                socketio.emit("ai:stream:error", {"message": str(e)}, to=room)
+            except Exception:
+                pass
+        finally:
+            # Always pop the manually pushed app context when greenlet exits
+            if ctx:
+                ctx.pop()
 
 
     @staticmethod

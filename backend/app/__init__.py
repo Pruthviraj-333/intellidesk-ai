@@ -47,6 +47,11 @@ def create_app(config_name: str | None = None) -> Flask:
     # ─── Configure JWT Callbacks ─────────────────────────────────────────────────
     _configure_jwt(app)
 
+    # ─── Pre-warm AI services (embedding model + ChromaDB client) ────────────────
+    # Runs once per gunicorn worker at startup so the first user request
+    # doesn't pay the cold-start penalty (~15s for embedding model load).
+    _warmup_ai_services(app)
+
     return app
 
 
@@ -65,13 +70,18 @@ def _init_extensions(app: Flask) -> None:
     )
     socketio.init_app(
         app,
-        cors_allowed_origins=app.config["CORS_ORIGINS"],
+        cors_allowed_origins="*",
         async_mode="eventlet",
         logger=False,
         engineio_logger=False,
     )
     limiter.init_app(app)
     mail.init_app(app)
+
+    # ── Register Socket.IO event handlers ────────────────────────────────────
+    # MUST be imported after socketio.init_app so the @socketio.on decorators
+    # bind to the fully-configured SocketIO instance.
+    import app.sockets  # noqa: F401  — side-effect import registers all handlers
 
 
 def _register_blueprints(app: Flask) -> None:
@@ -235,3 +245,29 @@ def _configure_jwt(app: Flask) -> None:
         return error_response(
             "TOKEN_REVOKED", "This token has been revoked. Please log in again.", 401
         )
+
+
+def _warmup_ai_services(app: Flask) -> None:
+    """
+    Pre-warm AI services at worker startup to avoid cold-start latency on the first request.
+
+    Loads:
+      - SentenceTransformer embedding model into memory (~15s first time, then cached)
+      - ChromaDB singleton HTTP client (establishes persistent connection)
+
+    Safe to call multiple times — both are singletons that no-op if already loaded.
+    Errors are caught and logged so a bad ChromaDB at startup doesn't block the app.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    with app.app_context():
+        try:
+            from app.services.rag_service import get_chroma_client, get_embedding_model
+            logger.info("Warming up embedding model...")
+            get_embedding_model()
+            logger.info("Warming up ChromaDB client...")
+            get_chroma_client()
+            logger.info("AI services warm-up complete.")
+        except Exception as e:
+            logger.warning(f"AI services warm-up failed (non-fatal): {e}")
