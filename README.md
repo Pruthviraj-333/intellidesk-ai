@@ -12,15 +12,15 @@
 
 ---
 
-## 🎬 Demo Video
+## Demo Video
 
 [![IntelliDesk AI — Watch Full Demo on YouTube](./readme_banner.jpg)](https://youtu.be/LGIFagqh4N4)
 
-> 📺 **Click the banner above** to watch the full platform walkthrough on YouTube — IntelliBot in action, RAG knowledge retrieval, conversational auto-ticket creation, and the real-time analytics dashboard.
+> **Click the banner above** to watch the full platform walkthrough on YouTube — IntelliBot in action, RAG knowledge retrieval, conversational auto-ticket creation, and the real-time analytics dashboard.
 
 ---
 
-## 🚀 What is IntelliDesk AI?
+## What is IntelliDesk AI?
 
 IntelliDesk AI is a production-grade enterprise ITSM platform that combines intelligent automation with a seamless service desk experience — inspired by **ServiceNow**, **Jira Service Management**, **Zendesk**, and **Microsoft Copilot**.
 
@@ -28,18 +28,18 @@ IntelliDesk AI is a production-grade enterprise ITSM platform that combines inte
 
 | Feature | Description |
 |---|---|
-| 🤖 **IntelliBot (AI Assistant)** | Context-aware conversational AI with RAG-powered knowledge base retrieval and citation support |
-| 🎫 **Auto Ticket Creation** | Employees raise IT tickets naturally through chat — IntelliBot creates and assigns tickets automatically |
-| 📋 **Full Ticket Lifecycle** | Create → Assign → Escalate → Resolve → Close with full SLA tracking and audit trail |
-| 🧠 **RAG Knowledge Base** | Upload PDFs/DOCX → auto chunk → embed → semantic vector search with source attribution |
-| 📊 **Business Intelligence** | Real-time KPIs, SLA compliance charts, agent performance metrics, and workload analytics |
-| 🔔 **Live Real-time Updates** | WebSocket-powered dashboard notifications via Socket.IO |
-| 🔐 **Enterprise RBAC** | 5-tier role system: Super Admin → Manager → Agent → IT Staff → Employee with JWT auth |
-| 🏷️ **ITIL-Aligned Management** | Incident, problem, and change management with root cause analysis and timeline tracking |
+| **IntelliBot (AI Assistant)** | Context-aware conversational AI with RAG-powered knowledge base retrieval and citation support |
+| **Auto Ticket Creation** | Employees raise IT tickets naturally through chat — IntelliBot creates and assigns tickets automatically |
+| **Full Ticket Lifecycle** | Create → Assign → Escalate → Resolve → Close with full SLA tracking and audit trail |
+| **RAG Knowledge Base** | Upload PDFs/DOCX → auto chunk → embed → semantic vector search with source attribution |
+| **Business Intelligence** | Real-time KPIs, SLA compliance charts, agent performance metrics, and workload analytics |
+| **Live Real-time Updates** | WebSocket-powered dashboard notifications via Socket.IO |
+| **Enterprise RBAC** | 5-tier role system: Super Admin → Manager → Agent → IT Staff → Employee with JWT auth |
+| **ITIL-Aligned Management** | Incident, problem, and change management with root cause analysis and timeline tracking |
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technologies |
 |---|---|
@@ -57,11 +57,11 @@ IntelliDesk AI is a production-grade enterprise ITSM platform that combines inte
 | **CI/CD** | GitHub Actions |
 | **Hosting** | Render (API) + Vercel (Frontend) + Neon (DB) |
 
-> 💰 **Total infrastructure cost: $0/month** using free tiers
+> **Total infrastructure cost: $0/month** using free tiers
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 Browser (React SPA)
@@ -90,7 +90,7 @@ PostgreSQL      Redis         ChromaDB
 
 ---
 
-## ⚡ Quick Start (Local Development)
+## Quick Start (Local Development)
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
@@ -133,23 +133,23 @@ make seed
 
 | Service | URL |
 |---|---|
-| 🌐 Frontend | http://localhost |
-| 🔌 API | http://localhost/api/v1 |
-| 📖 Swagger Docs | http://localhost/api/v1/docs |
-| 🌸 Celery Flower | http://localhost:5555 |
+| Frontend | http://localhost |
+| API | http://localhost/api/v1 |
+| Swagger Docs | http://localhost/api/v1/docs |
+| Celery Flower | http://localhost:5555 |
 
 ### 4. Default Login Credentials
 
 | Role | Email | Password |
 |---|---|---|
-| 🔴 Super Admin | admin@intellidesk.ai | Admin@123! |
-| 🟠 Manager | manager@intellidesk.ai | Manager@123! |
-| 🟡 Agent | agent@intellidesk.ai | Agent@123! |
-| 🟢 Employee | employee@intellidesk.ai | Employee@123! |
+| Super Admin | admin@intellidesk.ai | Admin@123! |
+| Manager | manager@intellidesk.ai | Manager@123! |
+| Agent | agent@intellidesk.ai | Agent@123! |
+| Employee | employee@intellidesk.ai | Employee@123! |
 
 ---
 
-## 🤖 IntelliBot — AI Chat Assistant
+## IntelliBot — AI Chat Assistant
 
 IntelliBot is the conversational AI core of IntelliDesk. Employees interact naturally to:
 
@@ -174,7 +174,7 @@ Answer with Citations → User
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 intellidesk-ai/
@@ -215,7 +215,7 @@ intellidesk-ai/
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 All design and architectural documents are in the `docs/` folder:
 
@@ -230,7 +230,7 @@ All design and architectural documents are in the `docs/` folder:
 
 ---
 
-## 🔍 For Recruiters & Engineers
+## Engineering Highlights
 
 ### Backend Engineering
 - Clean Architecture with strict layer separation
@@ -266,19 +266,19 @@ All design and architectural documents are in the `docs/` folder:
 
 ---
 
-## 📄 License
+## License
 
 MIT License — see [LICENSE](./LICENSE)
 
 ---
 
 <p align="center">
-  <strong>Built as a portfolio project demonstrating production-grade enterprise software engineering.</strong><br/>
+  <strong>Built as an enterprise-grade platform demonstrating production software engineering standards.</strong><br/>
   Every design decision documented. Every technology justified. Every pattern intentional.
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/LGIFagqh4N4">🎬 Watch Demo</a> ·
-  <a href="./docs/01-SRS/README.md">📖 Docs</a> ·
-  <a href="http://localhost/api/v1/docs">🔌 API Reference</a>
+  <a href="https://youtu.be/LGIFagqh4N4">Watch Demo</a> ·
+  <a href="./docs/01-SRS/README.md">Documentation</a> ·
+  <a href="http://localhost/api/v1/docs">API Reference</a>
 </p>
