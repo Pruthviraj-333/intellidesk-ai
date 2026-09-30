@@ -189,6 +189,36 @@ Answer with Citations → User
 
 ---
 
+## Running Tests & Quality Checks
+
+### Backend Test Suite
+```bash
+# Run unit and integration tests with coverage
+make test
+# Or directly via Docker:
+docker compose exec backend pytest tests/ -v
+```
+
+### Frontend Test Suite
+```bash
+# Run component and unit tests
+make frontend-test
+# Or directly via npm:
+cd frontend && npm run test
+```
+
+### Linting & Formatting
+```bash
+# Python backend linting (flake8, black, isort)
+make lint
+make format
+
+# Frontend linting (oxlint)
+make frontend-lint
+```
+
+---
+
 ## Project Structure
 
 ```
