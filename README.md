@@ -93,7 +93,8 @@ PostgreSQL      Redis         ChromaDB
 ## Quick Start (Local Development)
 
 ### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running)
+- [Node.js 18+](https://nodejs.org/) & npm
 - Git
 - Free Groq API key → [console.groq.com](https://console.groq.com)
 
@@ -103,7 +104,7 @@ PostgreSQL      Redis         ChromaDB
 git clone https://github.com/Pruthviraj-333/intellidesk-ai.git
 cd intellidesk-ai
 
-# Copy environment template and add your API keys
+# Copy backend environment template and add your API keys
 cp .env.example .env
 ```
 
@@ -113,32 +114,46 @@ GROQ_API_KEY=your_groq_api_key_here
 SECRET_KEY=your_random_secret_key
 ```
 
-### 2. Build & Run
+### 2. Start Infrastructure & Backend
 
+Using Make:
 ```bash
-# Build all Docker containers
-make build
-
-# Start all services (DB, Redis, ChromaDB, Backend, Frontend, NGINX)
-make up
-
-# Run database migrations
-make migrate
-
-# Seed demo users and data
-make seed
+make up       # Starts PostgreSQL, Redis, ChromaDB, Backend, Celery & NGINX
+make migrate  # Applies Alembic database migrations
+make seed     # Seeds roles, departments, and demo users
 ```
 
-### 3. Access the Application
+*Or using Docker Compose directly (PowerShell / Command Prompt):*
+```bash
+docker compose up -d
+docker compose exec backend flask db upgrade
+docker compose exec backend flask seed-db
+```
+
+### 3. Start Frontend
+
+In a separate terminal:
+```bash
+# Using Make
+make frontend-install
+make frontend-dev
+
+# Or using npm directly
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Access the Application
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost |
-| API | http://localhost/api/v1 |
-| Swagger Docs | http://localhost/api/v1/docs |
+| Frontend (UI) | http://localhost:5173 (or http://localhost via NGINX) |
+| Backend API | http://localhost:8000/api/v1 |
+| Swagger Docs | http://localhost:8000/api/v1/docs |
 | Celery Flower | http://localhost:5555 |
 
-### 4. Default Login Credentials
+### 5. Default Login Credentials
 
 | Role | Email | Password |
 |---|---|---|
