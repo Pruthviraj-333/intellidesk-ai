@@ -14,7 +14,7 @@
 
 ## Demo Video
 
-[![IntelliDesk AI — Watch Full Demo on YouTube](./readme_banner.jpg)](https://youtu.be/LGIFagqh4N4)
+[![IntelliDesk AI — Watch Full Demo on YouTube](./banner.jpg)](https://youtu.be/LGIFagqh4N4)
 
 > **Click the banner above** to watch the full platform walkthrough on YouTube — IntelliBot in action, RAG knowledge retrieval, conversational auto-ticket creation, and the real-time analytics dashboard.
 
