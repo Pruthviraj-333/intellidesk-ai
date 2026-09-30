@@ -1,6 +1,6 @@
 # IntelliDesk AI
 
-> **AI-Powered Enterprise Service Desk & Incident Management Platform**
+> **AI-Powered Enterprise IT Service Management (ITSM) Platform**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
@@ -12,72 +12,215 @@
 
 ---
 
-## What is IntelliDesk AI?
+## 🎬 Demo Video
 
-IntelliDesk AI is a production-grade enterprise IT Service Management (ITSM) platform combining:
+[![IntelliDesk AI — Watch Full Demo on YouTube](./readme_banner.jpg)](https://youtu.be/LGIFagqh4N4)
 
-- **Full ticket lifecycle management** — Create, assign, escalate, resolve, close with SLA tracking
-- **ITIL-aligned incident & problem management** — Root cause analysis, timeline tracking
-- **AI-powered automation** — Auto-classification, priority prediction, department routing via Groq LLM
-- **RAG knowledge retrieval** — Upload PDFs/DOCX → chunk → embed → query with citations
-- **Conversational AI assistant** — Context-aware chat with knowledge base and document search
-- **Business intelligence dashboards** — Real-time KPIs, charts, SLA compliance, agent performance
-- **Enterprise RBAC** — 5-tier role system (Super Admin → Employee) with JWT authentication
-- **WebSocket real-time updates** — Live dashboard and notifications via Socket.IO
-
-Inspired by: ServiceNow · Jira Service Management · Zendesk · Freshservice · Microsoft Copilot
+> 📺 **Click the banner above** to watch the full platform walkthrough on YouTube — IntelliBot in action, RAG knowledge retrieval, conversational auto-ticket creation, and the real-time analytics dashboard.
 
 ---
 
-## Tech Stack
+## 🚀 What is IntelliDesk AI?
+
+IntelliDesk AI is a production-grade enterprise ITSM platform that combines intelligent automation with a seamless service desk experience — inspired by **ServiceNow**, **Jira Service Management**, **Zendesk**, and **Microsoft Copilot**.
+
+### Core Capabilities
+
+| Feature | Description |
+|---|---|
+| 🤖 **IntelliBot (AI Assistant)** | Context-aware conversational AI with RAG-powered knowledge base retrieval and citation support |
+| 🎫 **Auto Ticket Creation** | Employees raise IT tickets naturally through chat — IntelliBot creates and assigns tickets automatically |
+| 📋 **Full Ticket Lifecycle** | Create → Assign → Escalate → Resolve → Close with full SLA tracking and audit trail |
+| 🧠 **RAG Knowledge Base** | Upload PDFs/DOCX → auto chunk → embed → semantic vector search with source attribution |
+| 📊 **Business Intelligence** | Real-time KPIs, SLA compliance charts, agent performance metrics, and workload analytics |
+| 🔔 **Live Real-time Updates** | WebSocket-powered dashboard notifications via Socket.IO |
+| 🔐 **Enterprise RBAC** | 5-tier role system: Super Admin → Manager → Agent → IT Staff → Employee with JWT auth |
+| 🏷️ **ITIL-Aligned Management** | Incident, problem, and change management with root cause analysis and timeline tracking |
+
+---
+
+## 🛠️ Tech Stack
 
 | Layer | Technologies |
-|-------|-------------|
+|---|---|
 | **Backend** | Python 3.11, Flask 3, SQLAlchemy 2, Alembic, Marshmallow, Flask-JWT-Extended |
-| **Task Queue** | Celery 5, Redis 7, Celery Beat |
-| **Real-time** | Flask-SocketIO (WebSockets) |
+| **Task Queue** | Celery 5, Redis 7, Celery Beat (scheduled tasks) |
+| **Real-time** | Flask-SocketIO (WebSockets via eventlet) |
 | **Database** | PostgreSQL 16 (Neon) |
 | **Vector DB** | ChromaDB |
-| **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 (local) |
-| **LLM** | Groq API (Llama 3.3 70B) |
+| **Embeddings** | sentence-transformers/all-MiniLM-L6-v2 (runs locally, no cost) |
+| **LLM** | Groq API — Llama 3.3 70B (streaming responses) |
 | **Frontend** | React 18, TypeScript, Vite, TailwindCSS |
-| **State** | Redux Toolkit + TanStack Query |
+| **State Management** | Redux Toolkit + TanStack Query |
 | **Charts** | Chart.js + react-chartjs-2 |
-| **Infra** | Docker, Docker Compose, NGINX, Gunicorn |
+| **Infrastructure** | Docker, Docker Compose, NGINX, Gunicorn |
 | **CI/CD** | GitHub Actions |
 | **Hosting** | Render (API) + Vercel (Frontend) + Neon (DB) |
 
-**Total infrastructure cost: $0/month**
+> 💰 **Total infrastructure cost: $0/month** using free tiers
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
-Browser → NGINX → Gunicorn (Flask)
-                       │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-   PostgreSQL        Redis        ChromaDB
-   (Neon)         (Cache+Queue)  (Vectors)
-                       │
-                    Celery
-                    Workers
-                       │
-                  Groq API (LLM)
+Browser (React SPA)
+       │
+     NGINX (Reverse Proxy + Rate Limiting)
+       │
+  Gunicorn / Flask App
+       │
+ ┌─────┼──────────┬──────────────┐
+ ▼     ▼          ▼              ▼
+PostgreSQL      Redis         ChromaDB
+(Primary DB)  (Cache +      (Vector Store)
+              Queue)              │
+               │           Sentence Transformers
+            Celery              (Embeddings)
+           Workers
+               │
+          Groq API (LLM)
+       Llama 3.3 70B (Stream)
 ```
 
-Clean Architecture: **Controller → Service → Repository → Model**  
-AI Provider Abstraction: **Strategy Pattern** (Groq primary, swappable)
+**Design Patterns:**
+- Clean Architecture: `Controller → Service → Repository → Model`
+- AI Provider Abstraction: Strategy Pattern (Groq primary, swappable)
+- Event-Driven: Socket.IO for live updates
 
 ---
 
-## Documentation
+## ⚡ Quick Start (Local Development)
 
-All design documents are in the `docs/` folder:
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Git
+- Free Groq API key → [console.groq.com](https://console.groq.com)
+
+### 1. Clone & Configure
+
+```bash
+git clone https://github.com/Pruthviraj-333/intellidesk-ai.git
+cd intellidesk-ai
+
+# Copy environment template and add your API keys
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+SECRET_KEY=your_random_secret_key
+```
+
+### 2. Build & Run
+
+```bash
+# Build all Docker containers
+make build
+
+# Start all services (DB, Redis, ChromaDB, Backend, Frontend, NGINX)
+make up
+
+# Run database migrations
+make migrate
+
+# Seed demo users and data
+make seed
+```
+
+### 3. Access the Application
+
+| Service | URL |
+|---|---|
+| 🌐 Frontend | http://localhost |
+| 🔌 API | http://localhost/api/v1 |
+| 📖 Swagger Docs | http://localhost/api/v1/docs |
+| 🌸 Celery Flower | http://localhost:5555 |
+
+### 4. Default Login Credentials
+
+| Role | Email | Password |
+|---|---|---|
+| 🔴 Super Admin | admin@intellidesk.ai | Admin@123! |
+| 🟠 Manager | manager@intellidesk.ai | Manager@123! |
+| 🟡 Agent | agent@intellidesk.ai | Agent@123! |
+| 🟢 Employee | employee@intellidesk.ai | Employee@123! |
+
+---
+
+## 🤖 IntelliBot — AI Chat Assistant
+
+IntelliBot is the conversational AI core of IntelliDesk. Employees interact naturally to:
+
+1. **Ask IT questions** — Wi-Fi setup, VPN config, hardware troubleshooting, software installs
+2. **Get instant answers** — RAG retrieves relevant knowledge base articles with source citations
+3. **Raise tickets automatically** — If the issue persists, IntelliBot creates and assigns a ticket through conversation without any manual forms
+4. **Track ticket status** — Ask IntelliBot for updates on open tickets
+
+**How IntelliBot RAG works:**
+
+```
+User Question
+     │
+Vector Search (ChromaDB)
+     │
+Top-K Relevant Chunks Retrieved
+     │
+Groq LLM (Llama 3.3 70B) — Streaming Response
+     │
+Answer with Citations → User
+```
+
+---
+
+## 📁 Project Structure
+
+```
+intellidesk-ai/
+├── backend/                  # Flask Python API (Clean Architecture)
+│   ├── app/
+│   │   ├── controllers/      # HTTP request handlers (Blueprints)
+│   │   ├── services/         # Business logic layer
+│   │   ├── repositories/     # Data access layer
+│   │   ├── models/           # SQLAlchemy ORM models
+│   │   ├── schemas/          # Marshmallow serialization/validation
+│   │   ├── ai/               # RAG pipeline, LLM abstraction, prompts
+│   │   ├── socket/           # Socket.IO event handlers
+│   │   └── tasks/            # Celery async task definitions
+│   ├── migrations/           # Alembic DB migration scripts
+│   ├── tests/                # Unit + integration test suite
+│   └── wsgi.py
+├── frontend/                 # React 18 TypeScript SPA
+│   ├── src/
+│   │   ├── pages/            # Dashboard, Tickets, IntelliBot, Analytics
+│   │   ├── components/       # Shared UI component library
+│   │   ├── store/            # Redux Toolkit slices
+│   │   ├── hooks/            # Custom React hooks
+│   │   └── services/         # API client & Socket.IO client
+├── nginx/                    # NGINX reverse proxy config
+├── docs/                     # Complete design documentation
+│   ├── 01-SRS/               # Software Requirement Specification
+│   ├── 02-Architecture/      # System architecture diagrams
+│   ├── 03-Database/          # Database schema design
+│   ├── 04-API/               # OpenAPI specification
+│   ├── 06-Roadmap/           # Development roadmap
+│   └── 07-TechStack/         # Technology justification
+├── .github/                  # GitHub Actions CI/CD pipelines
+├── docker-compose.yml
+├── Makefile
+├── .env.example
+└── README.md
+```
+
+---
+
+## 📚 Documentation
+
+All design and architectural documents are in the `docs/` folder:
 
 | Document | Path |
-|----------|------|
+|---|---|
 | Software Requirement Specification | [docs/01-SRS/](./docs/01-SRS/README.md) |
 | Architecture Design | [docs/02-Architecture/](./docs/02-Architecture/README.md) |
 | Database Design | [docs/03-Database/](./docs/03-Database/database-design.md) |
@@ -87,120 +230,55 @@ All design documents are in the `docs/` folder:
 
 ---
 
-## Quick Start (Local Development)
+## 🔍 For Recruiters & Engineers
 
-### Prerequisites
-- Docker Desktop
-- Git
-- Groq API key (free at [console.groq.com](https://console.groq.com))
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/intellidesk-ai.git
-cd intellidesk-ai
-
-# Copy environment file
-cp .env.example .env
-# Edit .env and add your GROQ_API_KEY, GMAIL credentials, etc.
-
-# Build and start all services
-make build
-make up
-
-# Run database migrations and seed data
-make migrate
-make seed
-
-# Access the application
-# Frontend: http://localhost (via NGINX)
-# API:      http://localhost/api/v1
-# API Docs: http://localhost/api/v1/docs
-# Flower:   http://localhost:5555
-```
-
-### Default Credentials (after seed)
-| Role | Email | Password |
-|------|-------|----------|
-| Super Admin | admin@intellidesk.ai | Admin@123! |
-| Manager | manager@intellidesk.ai | Manager@123! |
-| Agent | agent@intellidesk.ai | Agent@123! |
-| Employee | employee@intellidesk.ai | Employee@123! |
-
----
-
-## Key Features Demonstrated
-
-### For Software Engineer / Backend Roles
-- Clean Architecture (Controller → Service → Repository → DTO → Model)
-- Flask Blueprint-based modular API design
-- SQLAlchemy ORM with complex queries, relationships, and migrations
+### Backend Engineering
+- Clean Architecture with strict layer separation
+- Flask Blueprint-based modular API with 50+ endpoints
+- SQLAlchemy ORM — complex relationships, transactions, and migrations
 - JWT authentication with refresh token rotation and blacklisting
-- Celery async task processing with multiple queues
-- WebSocket real-time events with Flask-SocketIO
-- Rate limiting, input validation, error handling
-- Comprehensive test suite (unit + integration)
+- Celery async processing with priority queues and retry logic
+- WebSocket real-time events with namespace isolation
 
-### For AI / ML Engineer Roles
-- LLM provider abstraction (Strategy Pattern) — Groq with swappable interface
-- RAG pipeline: text extraction → chunking → embedding → vector search → LLM generate
-- Structured JSON output from LLMs
-- Streaming LLM responses via SSE
-- Prompt template management system
-- Semantic similarity search with confidence scoring
-- Citation and source attribution in AI responses
+### AI / ML Engineering
+- LLM provider abstraction via Strategy Pattern (Groq → swappable)
+- Full RAG pipeline: `extract → chunk → embed → index → retrieve → generate`
+- Streaming LLM responses via Server-Sent Events
+- Structured JSON output parsing from LLMs
+- Semantic similarity scoring and confidence thresholds
+- Source citation and attribution in AI responses
 
-### For Full Stack / React Roles
-- React 18 SPA with TypeScript
-- Redux Toolkit + TanStack Query hybrid state management
-- JWT interceptors with auto-refresh token rotation
-- WebSocket client with reconnection logic
+### Frontend Engineering
+- React 18 SPA with TypeScript — strict typing throughout
+- Redux Toolkit + TanStack Query hybrid (server vs. client state)
+- JWT interceptors with silent auto-refresh token rotation
+- Socket.IO client with reconnection logic and event queuing
 - Feature-based modular architecture
-- Comprehensive shared component library
 - Dark/light mode with system preference detection
 
-### For DevOps Roles
-- Multi-stage Docker builds (dev + prod targets)
-- Docker Compose multi-service orchestration
-- NGINX as reverse proxy with rate limiting and WebSocket support
-- GitHub Actions CI/CD (lint → test → deploy)
-- Health check endpoints for all services
-- Environment-based configuration
-- Structured JSON logging with correlation IDs
+### DevOps & Infrastructure
+- Multi-stage Docker builds (dev + production targets)
+- Docker Compose multi-service orchestration (7 services)
+- NGINX as reverse proxy with rate limiting and WebSocket upgrades
+- GitHub Actions CI/CD: lint → test → build → deploy
+- Health check endpoints for every service
+- Structured JSON logging with request correlation IDs
 
 ---
 
-## API Documentation
-
-Interactive Swagger UI available at: `http://localhost/api/v1/docs`
-
-Or import the OpenAPI spec from: `docs/04-API/openapi.yaml`
-
----
-
-## Project Structure
-
-```
-intellidesk-ai/
-├── backend/          # Flask Python API (Clean Architecture)
-├── frontend/         # React TypeScript SPA
-├── nginx/            # NGINX configuration
-├── docs/             # Complete design documentation
-├── .github/          # GitHub Actions CI/CD
-├── docker-compose.yml
-├── .env.example
-├── Makefile
-└── README.md
-```
-
----
-
-## License
+## 📄 License
 
 MIT License — see [LICENSE](./LICENSE)
 
 ---
 
-*Built as a portfolio project demonstrating production-grade enterprise software engineering.*  
-*Every design decision documented. Every technology justified. Every pattern intentional.*
+<p align="center">
+  <strong>Built as a portfolio project demonstrating production-grade enterprise software engineering.</strong><br/>
+  Every design decision documented. Every technology justified. Every pattern intentional.
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/LGIFagqh4N4">🎬 Watch Demo</a> ·
+  <a href="./docs/01-SRS/README.md">📖 Docs</a> ·
+  <a href="http://localhost/api/v1/docs">🔌 API Reference</a>
+</p>

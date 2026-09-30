@@ -1,0 +1,21 @@
+# Company Office Wi-Fi and Guest Access Guide
+
+## 1. Corporate Wi-Fi (For Employees)
+- Network Name (SSID): IntelliDesk-Staff
+- Security: WPA2-Enterprise
+- Username: Your corporate email address (e.g., john@intellidesk.ai)
+- Password: Your current corporate password
+- Recommended Frequency: 5 GHz band for best speed and latency.
+
+## 2. Guest Wi-Fi (For Visitors & Clients)
+- Network Name (SSID): IntelliDesk-Guest
+- Password: Guest@Desk2026
+- Speed Limit: 25 Mbps per connected device.
+- Note: The guest network provides internet access only and cannot reach internal servers, GitLab, or company printers.
+
+## 3. Wi-Fi Troubleshooting Steps
+If you cannot connect to IntelliDesk-Staff:
+1. Turn off Wi-Fi on your laptop, wait 5 seconds, and turn it back on.
+2. Right-click the network name and choose "Forget Network".
+3. Re-select "IntelliDesk-Staff" and type your corporate email and password again.
+4. If your password was recently changed, update your stored Wi-Fi credentials in Windows Network Settings.

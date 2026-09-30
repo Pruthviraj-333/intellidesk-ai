@@ -52,6 +52,14 @@ services:
       target: development
     container_name: intellidesk_backend
     restart: unless-stopped
+    command: >
+      gunicorn
+      --bind 0.0.0.0:8000
+      --workers 1
+      --worker-class eventlet
+      --worker-connections 1000
+      --timeout 120
+      wsgi:app
     env_file:
       - .env
     environment:
@@ -74,6 +82,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
 
   # ─── Celery Worker ──────────────────────────────────────────────────────────
   celery_worker:

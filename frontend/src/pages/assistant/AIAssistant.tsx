@@ -42,10 +42,10 @@ const SOCKET_URL =
 function createSocket(token: string): Socket {
   return io(SOCKET_URL, {
     auth: { token },
-    transports: ["websocket"],   // Skip polling entirely — prevents 'Bad file descriptor' on nginx
-    upgrade: false,              // Don't attempt transport upgrade after connect
+    transports: ["websocket"],  // Direct WS to port 8000 — polling via nginx drops auth token
+    autoConnect: false,         // We manually call .connect() after setting up all handlers
     reconnection: true,
-    reconnectionDelay: 2000,
+    reconnectionDelay: 1000,
     reconnectionAttempts: 10,
     timeout: 20000,
   });
@@ -77,6 +77,9 @@ export const AIAssistant: React.FC = () => {
 
   // ── Socket setup ────────────────────────────────────────────────────────────
   useEffect(() => {
+    // Only connect once the user is authenticated
+    if (!user) return;
+
     const token = localStorage.getItem("access_token");
     if (!token) return;
 
@@ -92,7 +95,14 @@ export const AIAssistant: React.FC = () => {
       setSocketReady(false);
     });
     socket.on("connect_error", (err) => {
-      console.error("[Socket] Connection error:", err.message, err);
+      console.error("[Socket] Connection error:", err.message);
+      // Retry with fresh token if available
+      const freshToken = localStorage.getItem("access_token");
+      if (freshToken && (socket.auth as any)?.token !== freshToken) {
+        console.log("[Socket] Retrying with refreshed token...");
+        socket.auth = { token: freshToken };
+        setTimeout(() => socket.connect(), 500);
+      }
     });
     socket.on("connected", (data: any) => {
       console.log("[Socket] Server ack:", data);
@@ -173,12 +183,16 @@ export const AIAssistant: React.FC = () => {
       setIsStreaming(false);
     });
 
+    // Connect AFTER all handlers are registered (autoConnect is false)
+    socket.connect();
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user]);
+
 
   const handleSelectSession = (uuid: string) => {
     if (activeSessionUuid === uuid) return;
