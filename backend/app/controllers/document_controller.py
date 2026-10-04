@@ -123,7 +123,13 @@ def reprocess_document(doc_id: int):
             "Only 'pending' or 'failed' documents can be requeued."
         )
 
-    from app.tasks.document_tasks import process_document_task
+    from app.tasks.document_tasks import process_document_task, purge_document_vectors_task
+
+    # Purge any stale vectors from the previous processing cycle before re-indexing.
+    # Without this, if the new chunk count differs from the old one, orphan chunks
+    # remain in ChromaDB and pollute future RAG retrievals.
+    if doc.is_processed:
+        purge_document_vectors_task.delay(doc_id)
 
     process_document_task.delay(doc_id)
     return success_response({"message": "Document queued for reprocessing.", "document_id": doc_id})
@@ -136,7 +142,19 @@ def delete_document(doc_id: int):
     doc = DocumentRepository.get_by_id(doc_id)
     if not doc:
         raise NotFoundError("Document", doc_id)
+
+    # Soft-delete the Postgres record immediately so it is invisible to all
+    # queries — the HTTP response can return without waiting for ChromaDB.
+    was_processed = doc.is_processed
     DocumentRepository.soft_delete(doc)
+
+    # Async ChromaDB vector purge — non-blocking, retried by Celery on failure.
+    # Prevents stale chunks from surfacing in RAG retrieval after deletion.
+    if was_processed:
+        from app.tasks.document_tasks import purge_document_vectors_task
+
+        purge_document_vectors_task.delay(doc_id)
+
     return no_content_response()
 
 

@@ -17,6 +17,23 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Signal phrases the LLM uses when it is ready to raise a ticket.
+# Defined once at module level so chat() and chat_stream() always
+# share the same list — a local copy in each method caused silent
+# detection drift whenever one list was updated but not the other.
+_TICKET_SIGNAL_PHRASES = [
+    "i'm raising a ticket for you now",
+    "i am raising a ticket for you now",
+    "raising a ticket for you now",
+    "i have all the details i need",
+    "i'll raise a ticket",
+    "i will raise a ticket",
+    "creating a ticket for you",
+    "i've raised a ticket",
+    "i have raised a ticket",
+    "ticket has been raised",
+]
+
 
 class AIChatService:
     """
@@ -179,20 +196,6 @@ class AIChatService:
         db.session.commit()
 
         # 10. Agentic Ticket Creation — run intent detector on full conversation
-        # Signal phrases the AI uses when it has gathered enough info to raise a ticket
-        TICKET_SIGNAL_PHRASES = [
-            "i'm raising a ticket for you now",
-            "i am raising a ticket for you now",
-            "raising a ticket for you now",
-            "i have all the details i need",
-            "i'll raise a ticket",
-            "i will raise a ticket",
-            "creating a ticket for you",
-            "i've raised a ticket",
-            "i have raised a ticket",
-            "ticket has been raised",
-        ]
-
         ticket_created_meta = None
         try:
             full_history = AIChatService._build_history(session)
@@ -203,7 +206,7 @@ class AIChatService:
             # full_history[-2:] are the current user+assistant messages just committed
             earlier_messages = full_history[:-2] if len(full_history) >= 2 else []
             already_signalled_before = any(
-                any(phrase in m["content"].lower() for phrase in TICKET_SIGNAL_PHRASES)
+                any(phrase in m["content"].lower() for phrase in _TICKET_SIGNAL_PHRASES)
                 for m in earlier_messages
                 if m["role"] == "assistant"
             )
@@ -215,7 +218,7 @@ class AIChatService:
                 )
             else:
                 # Check if current AI response signals readiness to raise ticket
-                ai_signalled = any(phrase in response_lower for phrase in TICKET_SIGNAL_PHRASES)
+                ai_signalled = any(phrase in response_lower for phrase in _TICKET_SIGNAL_PHRASES)
 
                 if ai_signalled:
                     # Force mode: AI signalled readiness — extract fields from conversation
@@ -420,32 +423,19 @@ class AIChatService:
             db.session.commit()
 
             # 11. Agentic Ticket Creation (same logic as chat())
-            TICKET_SIGNAL_PHRASES = [
-                "i'm raising a ticket for you now",
-                "i am raising a ticket for you now",
-                "raising a ticket for you now",
-                "i have all the details i need",
-                "i'll raise a ticket",
-                "i will raise a ticket",
-                "creating a ticket for you",
-                "i've raised a ticket",
-                "i have raised a ticket",
-                "ticket has been raised",
-            ]
-
             ticket_created_meta = None
             try:
                 full_history = AIChatService._build_history(session)
                 response_lower = response_text.lower()
                 earlier_messages = full_history[:-2] if len(full_history) >= 2 else []
                 already_signalled_before = any(
-                    any(phrase in m["content"].lower() for phrase in TICKET_SIGNAL_PHRASES)
+                    any(phrase in m["content"].lower() for phrase in _TICKET_SIGNAL_PHRASES)
                     for m in earlier_messages
                     if m["role"] == "assistant"
                 )
 
                 if not already_signalled_before:
-                    ai_signalled = any(phrase in response_lower for phrase in TICKET_SIGNAL_PHRASES)
+                    ai_signalled = any(phrase in response_lower for phrase in _TICKET_SIGNAL_PHRASES)
                     if ai_signalled:
                         ticket_fields = LLMService.extract_ticket_intent(full_history, force=True)
                     else:

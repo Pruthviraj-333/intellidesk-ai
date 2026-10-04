@@ -113,3 +113,6 @@ temp/
 # ─── Celery ───────────────────────────────────────────────────────────────────
 celerybeat-schedule
 celerybeat.pid
+
+# ─── Drafts / Local Blog Posts ─────────────────────────────────────────────────
+BLOG_POST.md

@@ -37,8 +37,25 @@ def get_embedding_model():
 
 
 def get_chroma_client():
-    """Get (or create) singleton ChromaDB HTTP client."""
+    """
+    Get (or create) singleton ChromaDB HTTP client.
+
+    Validates the existing connection with a lightweight heartbeat before
+    returning it. If the heartbeat fails (e.g. ChromaDB restarted, socket
+    dropped), the stale client is discarded and a fresh connection is made.
+    This prevents the singleton from silently failing for the entire lifetime
+    of a Flask or Celery worker process after a ChromaDB reconnect.
+    """
     global _chroma_client
+
+    # Validate existing connection — heartbeat is a ~1 ms no-op on the server
+    if _chroma_client is not None:
+        try:
+            _chroma_client.heartbeat()
+        except Exception:
+            logger.warning("ChromaDB connection lost — resetting client for reconnect.")
+            _chroma_client = None
+
     if _chroma_client is None:
         import chromadb
 
@@ -46,6 +63,7 @@ def get_chroma_client():
         port = current_app.config.get("CHROMA_PORT", 8001)
         _chroma_client = chromadb.HttpClient(host=host, port=int(port))
         logger.info(f"ChromaDB client connected: {host}:{port}")
+
     return _chroma_client
 
 
@@ -127,16 +145,14 @@ class RAGService:
             embeddings = model.encode(chunks, normalize_embeddings=True).tolist()
             chroma_ids = [f"article_{article.id}_chunk_{i}" for i in range(len(chunks))]
 
-            # Delete old entries if re-indexing
+            # Delete old entries if re-indexing.
+            # Uses a where-clause delete directly — avoids the TypeError caused by iterating
+            # over the flat list[str] returned by collection.get(...)["ids"].
+            # collection.delete(where=...) is a no-op when no matching records exist.
             try:
-                existing_ids = [
-                    doc["id"]
-                    for doc in collection.get(where={"article_id": str(article.id)})["ids"]
-                ]
-                if existing_ids:
-                    collection.delete(ids=existing_ids)
+                collection.delete(where={"article_id": str(article.id)})
             except Exception:
-                pass  # No existing entries
+                pass  # Collection empty on first index — safe to ignore
 
             collection.upsert(
                 ids=chroma_ids,
@@ -170,10 +186,30 @@ class RAGService:
             client = get_chroma_client()
             collection = client.get_or_create_collection(RAGService.ARTICLE_COLLECTION)
             collection.delete(where={"article_id": str(article_id)})
+            logger.info(f"Article {article_id} vectors purged from ChromaDB.")
             return True
         except Exception as e:
             logger.error(f"Failed to remove article {article_id} from index: {e}")
             return False
+
+    @staticmethod
+    def remove_document_from_index(document_id: int) -> bool:
+        """Remove all chunk vectors for a document from ChromaDB.
+
+        Called asynchronously via Celery when a document is deleted or
+        re-queued for reprocessing, so stale vectors never surface in RAG retrieval.
+        Safe to call multiple times — delete on a non-existent where-clause is a no-op.
+        """
+        try:
+            client = get_chroma_client()
+            collection = client.get_or_create_collection(RAGService.DOCUMENT_COLLECTION)
+            collection.delete(where={"document_id": str(document_id)})
+            logger.info(f"Document {document_id} vectors purged from ChromaDB.")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to purge document {document_id} vectors: {e}")
+            return False
+
 
     # ─── Document Indexing ─────────────────────────────────────────────────────
 
@@ -197,6 +233,14 @@ class RAGService:
                 name=RAGService.DOCUMENT_COLLECTION,
                 metadata={"hnsw:space": "cosine"},
             )
+
+            # Purge any existing chunks for this document before re-indexing.
+            # Guards against orphan vectors when index_document() is called directly
+            # (e.g. admin scripts, tests) rather than via the Celery purge task.
+            try:
+                collection.delete(where={"document_id": str(document.id)})
+            except Exception:
+                pass  # No-op if collection is empty — safe to ignore
 
             embeddings = model.encode(chunks, normalize_embeddings=True).tolist()
             chroma_ids = [f"doc_{document.id}_chunk_{i}" for i in range(len(chunks))]
@@ -257,9 +301,18 @@ class RAGService:
             for coll_name in collections:
                 try:
                     collection = client.get_collection(coll_name)
+
+                    # Cap n_results to actual collection size.
+                    # ChromaDB raises InvalidArgumentError if n_results > count(),
+                    # which would silently swallow all results for that collection.
+                    count = collection.count()
+                    if count == 0:
+                        continue
+                    capped_n = min(n_results, count)
+
                     query_kwargs = {
                         "query_embeddings": [query_embedding],
-                        "n_results": n_results,
+                        "n_results": capped_n,
                         "include": ["documents", "metadatas", "distances"],
                     }
                     if filters:

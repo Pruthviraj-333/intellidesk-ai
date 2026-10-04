@@ -36,3 +36,32 @@ def process_document_task(self, document_id: int):
     except Exception as exc:
         logger.error(f"Document task failed for doc={document_id}: {exc}")
         raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, queue="documents", max_retries=3, default_retry_delay=15)
+def purge_document_vectors_task(self, document_id: int):
+    """
+    Async ChromaDB vector cleanup for a deleted or re-queued document.
+
+    Triggered non-blocking after:
+      - DELETE /api/v1/documents/:id  (prevent stale vectors post-deletion)
+      - POST   /api/v1/documents/:id/reprocess  (clear old chunks before re-indexing)
+
+    Retries up to 3 times with 15s delay to handle transient ChromaDB unavailability.
+    Idempotent — delete on a non-existent where-clause is a no-op in ChromaDB.
+    """
+    try:
+        from app.services.rag_service import RAGService
+
+        logger.info(f"Purging ChromaDB vectors for document {document_id}.")
+        success = RAGService.remove_document_from_index(document_id)
+
+        if success:
+            logger.info(f"Vectors purged successfully for document {document_id}.")
+        else:
+            logger.error(f"Vector purge returned False for document {document_id}.")
+
+    except Exception as exc:
+        logger.error(f"Vector purge task failed for doc={document_id}: {exc}")
+        raise self.retry(exc=exc)
+
