@@ -27,6 +27,7 @@ from app.repositories.ticket_repository import TicketRepository
 from app.services.ai_service import AIChatService, AITicketClassifier
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
+from app.extensions import limiter
 from app.utils.constants import UserRole
 from app.utils.decorators import (
     get_current_user_id,
@@ -52,6 +53,7 @@ ai_bp = Blueprint("ai", __name__, url_prefix="/api/v1/ai")
 
 @ai_bp.route("/chat", methods=["POST"])
 @jwt_required()
+@limiter.limit("30/minute")
 @validate_body(ChatRequestSchema)
 def chat(data: dict):
     """
@@ -72,6 +74,7 @@ def chat(data: dict):
 
 @ai_bp.route("/chat/stream", methods=["POST"])
 @jwt_required()
+@limiter.limit("30/minute")
 def chat_stream_sse():
     """
     POST /api/v1/ai/chat/stream

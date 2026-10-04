@@ -159,11 +159,13 @@ def delete_document(doc_id: int):
 
 
 @document_bp.route("/local/<path:filename>", methods=["GET"])
+@jwt_required()
+@role_required(UserRole.AGENT, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 def serve_local_document(filename: str):
     """
     GET /api/v1/documents/local/<filename>
-    Serve locally stored documents (used when Cloudinary is not configured).
-    No auth required so the processing pipeline can download files internally.
+    Serve locally stored documents (fallback when Cloudinary is not configured).
+    Requires authentication — only authenticated users may download files.
     """
     import os
 
