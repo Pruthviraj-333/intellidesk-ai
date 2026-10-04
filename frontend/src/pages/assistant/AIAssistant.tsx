@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
 import api from "../../services/api";
 import { useAuthStore } from "../../store/authStore";
 import { FormattedMarkdown } from "../../components/common/FormattedMarkdown";
@@ -33,165 +32,39 @@ interface ChatMessage {
   } | null;
 }
 
-const SOCKET_URL =
-  (import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1").replace(
-    "/api/v1",
-    ""
-  );
-
-function createSocket(token: string): Socket {
-  return io(SOCKET_URL, {
-    auth: { token },
-    transports: ["websocket"],  // Direct WS to port 8000 — polling via nginx drops auth token
-    autoConnect: false,         // We manually call .connect() after setting up all handlers
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 10,
-    timeout: 20000,
-  });
-}
+// Base API URL for the SSE streaming endpoint.
+// This is a plain HTTP POST — no WebSocket, no Socket.IO.
+// Works through AWS ALB, Nginx, CloudFront — any HTTP proxy.
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export const AIAssistant: React.FC = () => {
   const { user } = useAuthStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
   const streamingIdRef = useRef<number | null>(null);
+  // AbortController lets us cancel an in-flight SSE stream (e.g. user navigates away)
+  const abortCtrlRef = useRef<AbortController | null>(null);
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionUuid, setActiveSessionUuid] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [socketReady, setSocketReady] = useState(false);
   const [showSourcesForMsg, setShowSourcesForMsg] = useState<number | null>(null);
 
   const [ticketId, setTicketId] = useState("");
   const [ticketHelperResult, setTicketHelperResult] = useState<any | null>(null);
   const [helperLoading, setHelperLoading] = useState(false);
 
-  // Active session uuid ref for use inside socket callbacks
   const activeSessionUuidRef = useRef<string | null>(null);
   useEffect(() => {
     activeSessionUuidRef.current = activeSessionUuid;
   }, [activeSessionUuid]);
 
-  // ── Socket setup ────────────────────────────────────────────────────────────
+  // Cancel any in-flight stream when the component unmounts
   useEffect(() => {
-    // Only connect once the user is authenticated
-    if (!user) return;
+    return () => { abortCtrlRef.current?.abort(); };
+  }, []);
 
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
-
-    const socket = createSocket(token);
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("[Socket] Connected:", socket.id);
-      setSocketReady(true);
-    });
-    socket.on("disconnect", (reason) => {
-      console.warn("[Socket] Disconnected:", reason);
-      setSocketReady(false);
-    });
-    socket.on("connect_error", (err) => {
-      console.error("[Socket] Connection error:", err.message);
-      // Retry with fresh token if available
-      const freshToken = localStorage.getItem("access_token");
-      if (freshToken && (socket.auth as any)?.token !== freshToken) {
-        console.log("[Socket] Retrying with refreshed token...");
-        socket.auth = { token: freshToken };
-        setTimeout(() => socket.connect(), 500);
-      }
-    });
-    socket.on("connected", (data: any) => {
-      console.log("[Socket] Server ack:", data);
-    });
-
-    socket.on("ai:stream:start", (data: { session_uuid: string; session_title: string }) => {
-      const streamId = Date.now() + 1;
-      streamingIdRef.current = streamId;
-      setMessages((prev) => [
-        ...prev,
-        { id: streamId, sender_type: "assistant", content: "", isStreaming: true },
-      ]);
-      if (!activeSessionUuidRef.current && data.session_uuid) {
-        setActiveSessionUuid(data.session_uuid);
-        activeSessionUuidRef.current = data.session_uuid;
-      }
-    });
-
-    socket.on("ai:stream:chunk", (data: { chunk: string }) => {
-      const id = streamingIdRef.current;
-      if (id === null) return;
-      setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, content: m.content + data.chunk } : m))
-      );
-    });
-
-    socket.on(
-      "ai:stream:done",
-      (data: {
-        session_uuid: string;
-        session_title: string;
-        model: string;
-        tokens_used: number;
-        latency_ms: number;
-        sources: any[];
-        ticket_created: any | null;
-      }) => {
-        const id = streamingIdRef.current;
-        if (id !== null) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === id
-                ? {
-                    ...m,
-                    isStreaming: false,
-                    rag_sources: data.sources,
-                    latency_ms: data.latency_ms,
-                    tokens_used: data.tokens_used,
-                    ticket_created: data.ticket_created || null,
-                  }
-                : m
-            )
-          );
-          streamingIdRef.current = null;
-        }
-        setIsStreaming(false);
-        fetchSessions(false);
-      }
-    );
-
-    socket.on("ai:stream:error", (data: { message: string }) => {
-      const id = streamingIdRef.current;
-      if (id !== null) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === id
-              ? { ...m, isStreaming: false, content: `⚠️ Error: ${data.message}` }
-              : m
-          )
-        );
-        streamingIdRef.current = null;
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now(), sender_type: "assistant", content: `⚠️ Error: ${data.message}` },
-        ]);
-      }
-      setIsStreaming(false);
-    });
-
-    // Connect AFTER all handlers are registered (autoConnect is false)
-    socket.connect();
-
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
 
   const handleSelectSession = (uuid: string) => {
@@ -263,23 +136,132 @@ export const AIAssistant: React.FC = () => {
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const socket = socketRef.current;
-      if (!inputText.trim() || isStreaming || !socket?.connected) return;
+      if (!inputText.trim() || isStreaming) return;
 
       const userMessageContent = inputText;
       setInputText("");
       setIsStreaming(true);
 
+      // 1. Show user message immediately
+      const userMsgId = Date.now();
       setMessages((prev) => [
         ...prev,
-        { id: Date.now(), sender_type: "user", content: userMessageContent },
+        { id: userMsgId, sender_type: "user", content: userMessageContent },
       ]);
 
-      socket.emit("ai:chat", {
-        query: userMessageContent,
-        session_uuid: activeSessionUuidRef.current || null,
-        ticket_id: null,
-      });
+      // 2. Add empty assistant placeholder
+      const assistantMsgId = userMsgId + 1;
+      streamingIdRef.current = assistantMsgId;
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantMsgId, sender_type: "assistant", content: "", isStreaming: true },
+      ]);
+
+      // 3. Stream via SSE (plain HTTP POST — works through any proxy or load balancer)
+      const abortCtrl = new AbortController();
+      abortCtrlRef.current = abortCtrl;
+
+      try {
+        const token = localStorage.getItem("access_token");
+        const response = await fetch(`${API_BASE}/ai/chat/stream`, {
+          method:  "POST",
+          headers: {
+            "Content-Type":  "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body:   JSON.stringify({
+            query:        userMessageContent,
+            session_uuid: activeSessionUuidRef.current || null,
+            ticket_id:    null,
+          }),
+          signal: abortCtrl.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`Server error ${response.status}`);
+        }
+
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let   buffer  = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE frames are separated by double newline
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() ?? "";  // keep incomplete frame
+
+          for (const frame of parts) {
+            for (const line of frame.split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const event = JSON.parse(line.slice(6));
+
+                if (event.type === "start") {
+                  // Capture session UUID from first event
+                  if (!activeSessionUuidRef.current && event.session_uuid) {
+                    setActiveSessionUuid(event.session_uuid);
+                    activeSessionUuidRef.current = event.session_uuid;
+                  }
+
+                } else if (event.type === "chunk") {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId
+                        ? { ...m, content: m.content + event.content }
+                        : m
+                    )
+                  );
+
+                } else if (event.type === "done") {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId
+                        ? {
+                            ...m,
+                            isStreaming:    false,
+                            rag_sources:    event.sources,
+                            latency_ms:     event.latency_ms,
+                            tokens_used:    event.tokens_used,
+                            ticket_created: event.ticket_created || null,
+                          }
+                        : m
+                    )
+                  );
+                  fetchSessions(false);
+
+                } else if (event.type === "error") {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId
+                        ? { ...m, isStreaming: false, content: `⚠️ ${event.message}` }
+                        : m
+                    )
+                  );
+                }
+              } catch {
+                // Malformed SSE line — skip
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") return; // user navigated away
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? { ...m, isStreaming: false, content: `⚠️ Connection error: ${err.message}` }
+              : m
+          )
+        );
+      } finally {
+        streamingIdRef.current = null;
+        setIsStreaming(false);
+      }
     },
     [inputText, isStreaming]
   );
@@ -346,7 +328,7 @@ export const AIAssistant: React.FC = () => {
   };
 
   const isStaff = user && ["agent", "manager", "admin", "super_admin"].includes(user.role);
-  const sendDisabled = isStreaming || !inputText.trim() || !socketReady;
+  const sendDisabled = isStreaming || !inputText.trim();
 
   return (
     <div className="chat-page">
@@ -501,7 +483,7 @@ export const AIAssistant: React.FC = () => {
           <input
             type="text"
             className="input-field"
-            placeholder={socketReady ? "Type your question or query..." : "Connecting to IntelliBot…"}
+            placeholder={isStreaming ? "IntelliBot is responding…" : "Type your question or query..."}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isStreaming}

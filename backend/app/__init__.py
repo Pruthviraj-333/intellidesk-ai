@@ -74,6 +74,15 @@ def _init_extensions(app: Flask) -> None:
         async_mode="eventlet",
         logger=False,
         engineio_logger=False,
+        # Keep connections alive during long LLM streaming responses.
+        # Default ping_interval=25s / ping_timeout=20s is too aggressive for
+        # Groq streaming calls that can take 5-30s before the first token.
+        ping_interval=60,
+        ping_timeout=120,
+        # Allow polling → WebSocket upgrade (default).
+        # Needed so the client can fall back to polling if the WS handshake
+        # fails due to eventlet's 'Bad file descriptor' on stale connections.
+        allow_upgrades=True,
     )
     limiter.init_app(app)
     mail.init_app(app)

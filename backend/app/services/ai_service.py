@@ -497,6 +497,222 @@ class AIChatService:
 
 
     @staticmethod
+    def generate_chat_sse(
+        user_id: int,
+        query: str,
+        session_uuid: Optional[str] = None,
+        ticket_id: Optional[int] = None,
+        n_rag_results: int = 4,
+    ):
+        """
+        Server-Sent Events generator for chat streaming.
+
+        Runs the full RAG → LLM pipeline SYNCHRONOUSLY inside the Flask
+        request context (no background greenlet needed). Yields SSE-formatted
+        byte strings so Flask can stream them directly to the client via
+        Response(stream_with_context(generator), mimetype='text/event-stream').
+
+        This approach is production-grade and works with:
+          - Any HTTP/1.1 or HTTP/2 connection
+          - AWS ALB (set idle timeout > max LLM latency, e.g. 300 s)
+          - Nginx (proxy_buffering off already set)
+          - CloudFront (disable compression for text/event-stream)
+          - No WebSocket negotiation, no socket.io handshake
+
+        SSE event types emitted:
+          data: {"type": "start",  "session_uuid": ..., "session_title": ...}
+          data: {"type": "chunk",  "content": "<token>"}
+          data: {"type": "done",   "session_uuid": ..., "session_title": ...,
+                                   "model": ..., "tokens_used": ...,
+                                   "latency_ms": ..., "sources": [...],
+                                   "ticket_created": {...} | null}
+          data: {"type": "error",  "message": "<error text>"}
+        """
+        import json
+
+        def _sse(payload: dict) -> bytes:
+            """Encode a dict as an SSE data line."""
+            return f"data: {json.dumps(payload)}\n\n".encode()
+
+        try:
+            # ── 1. Session ────────────────────────────────────────────────────
+            session = AIChatService.get_or_create_session(
+                user_id=user_id,
+                session_uuid=session_uuid,
+                ticket_id=ticket_id,
+            )
+
+            # ── 2. Auto-title on first message ────────────────────────────────
+            if session.message_count == 0:
+                session.title = query[:100]
+                db.session.commit()
+
+            # ── 3. RAG retrieval ──────────────────────────────────────────────
+            rag_results = RAGService.semantic_search(query=query, n_results=n_rag_results)
+            if rag_results:
+                context_parts = []
+                for i, r in enumerate(rag_results):
+                    meta = r["metadata"]
+                    label = meta.get("title") or meta.get("file_name") or "Knowledge Base"
+                    context_parts.append(
+                        f"[Source {i+1}: {label} (score: {r['score']})]\n{r['content']}"
+                    )
+                context = "\n\n---\n\n".join(context_parts)
+            else:
+                context = ""
+
+            # ── 4. Conversation history ───────────────────────────────────────
+            history = AIChatService._build_history(session)
+
+            # ── 5. Assemble messages ──────────────────────────────────────────
+            messages = [{"role": "system", "content": LLMService.SYSTEM_PROMPT}]
+            if context:
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Use the following knowledge base context to answer "
+                        f"the user's question:\n\n{context}"
+                    ),
+                })
+            messages.extend(history)
+            messages.append({"role": "user", "content": query})
+
+            # ── 6. Emit start event ───────────────────────────────────────────
+            yield _sse({"type": "start", "session_uuid": session.session_uuid,
+                         "session_title": session.title})
+
+            # ── 7. Stream LLM tokens ──────────────────────────────────────────
+            response_chunks = []
+            model_used = None
+            prompt_tokens = 0
+            completion_tokens = 0
+            latency_ms = 0
+
+            for item in LLMService.chat_completion_stream(
+                messages=messages,
+                temperature=0.6,
+                max_tokens=1024,
+            ):
+                if "model" in item and not item.get("done"):
+                    model_used = item["model"]
+
+                elif "chunk" in item:
+                    chunk_text = item["chunk"]
+                    response_chunks.append(chunk_text)
+                    yield _sse({"type": "chunk", "content": chunk_text})
+
+                elif item.get("done"):
+                    model_used    = item.get("model", model_used)
+                    prompt_tokens = item.get("prompt_tokens", 0)
+                    completion_tokens = item.get("completion_tokens", len(response_chunks))
+                    latency_ms    = item.get("latency_ms", 0)
+
+            response_text = "".join(response_chunks)
+            total_tokens  = prompt_tokens + completion_tokens
+
+            # ── 8–9. Persist messages ─────────────────────────────────────────
+            user_msg = AIMessage(
+                session_id=session.id,
+                role="user",
+                content=query,
+                tokens_used=prompt_tokens,
+                model_used=model_used,
+            )
+            db.session.add(user_msg)
+
+            rag_source_meta = [
+                {
+                    "content_preview": r["content"][:150],
+                    "score": r["score"],
+                    "collection": r["collection"],
+                    "metadata": r["metadata"],
+                }
+                for r in rag_results
+            ]
+            assistant_msg = AIMessage(
+                session_id=session.id,
+                role="assistant",
+                content=response_text,
+                tokens_used=completion_tokens,
+                rag_sources=rag_source_meta,
+                model_used=model_used,
+                latency_ms=latency_ms,
+            )
+            db.session.add(assistant_msg)
+
+            # ── 10. Update session counters ───────────────────────────────────
+            session.message_count    += 2
+            session.total_tokens_used += total_tokens
+            db.session.commit()
+
+            # ── 11. Agentic Ticket Creation ───────────────────────────────────
+            ticket_created_meta = None
+            try:
+                full_history   = AIChatService._build_history(session)
+                response_lower = response_text.lower()
+                earlier_messages = full_history[:-2] if len(full_history) >= 2 else []
+                already_signalled_before = any(
+                    any(phrase in m["content"].lower() for phrase in _TICKET_SIGNAL_PHRASES)
+                    for m in earlier_messages
+                    if m["role"] == "assistant"
+                )
+
+                if not already_signalled_before:
+                    ai_signalled = any(phrase in response_lower for phrase in _TICKET_SIGNAL_PHRASES)
+                    ticket_fields = LLMService.extract_ticket_intent(
+                        full_history, force=ai_signalled
+                    )
+                    if ticket_fields:
+                        from app.services.ticket_service import TicketService
+                        new_ticket = TicketService.create_ticket(
+                            title=ticket_fields["title"],
+                            description=ticket_fields["description"],
+                            requester_id=user_id,
+                            priority=ticket_fields.get("priority"),
+                            category=ticket_fields.get("category"),
+                        )
+                        ticket_created_meta = {
+                            "id":            new_ticket.id,
+                            "ticket_number": new_ticket.ticket_number,
+                            "title":         new_ticket.title,
+                            "priority":      new_ticket.priority,
+                            "category":      new_ticket.category,
+                            "status":        new_ticket.status,
+                        }
+                        assistant_msg.ticket_created = ticket_created_meta
+                        db.session.commit()
+                        logger.info(
+                            f"Agentic ticket created (SSE): {new_ticket.ticket_number} "
+                            f"session={session.session_uuid} user={user_id}"
+                        )
+            except Exception as e:
+                logger.error(f"Agentic ticket creation failed (SSE): {e}")
+
+            logger.info(
+                f"AI SSE stream: session={session.session_uuid} tokens={total_tokens} "
+                f"latency={latency_ms}ms rag_hits={len(rag_results)}"
+            )
+
+            # ── 12. Emit done event ───────────────────────────────────────────
+            yield _sse({
+                "type":          "done",
+                "session_uuid":  session.session_uuid,
+                "session_title": session.title,
+                "model":         model_used,
+                "tokens_used":   total_tokens,
+                "latency_ms":    latency_ms,
+                "sources":       rag_source_meta,
+                "ticket_created": ticket_created_meta,
+            })
+
+        except Exception as e:
+            import traceback
+            logger.error(f"generate_chat_sse failed for user={user_id}: {e}\n{traceback.format_exc()}")
+            import json
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n".encode()
+
+
+    @staticmethod
     def _build_history(session: AISession) -> list[dict]:
         """
         Build the last N messages as history for multi-turn context.

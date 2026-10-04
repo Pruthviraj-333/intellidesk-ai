@@ -63,7 +63,13 @@ class Document(db.Model, TimestampMixin, SoftDeleteMixin):
 
     @property
     def can_be_processed(self) -> bool:
-        return self.status in (DocumentStatus.PENDING.value, DocumentStatus.FAILED.value)
+        # Allow pending, failed, AND already-processed docs to be requeued.
+        # Admins need to re-embed processed documents when file content changes.
+        return self.status in (
+            DocumentStatus.PENDING.value,
+            DocumentStatus.FAILED.value,
+            DocumentStatus.PROCESSED.value,
+        )
 
     def mark_processing(self) -> None:
         self.status = DocumentStatus.PROCESSING.value

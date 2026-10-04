@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
-import { 
-  UploadCloud, 
-  FileText, 
-  RefreshCw, 
-  CheckCircle2, 
-  Loader2, 
-  AlertCircle, 
-  Clock
+import {
+  UploadCloud,
+  FileText,
+  RefreshCw,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Clock,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 
 interface DocumentInfo {
@@ -23,11 +25,14 @@ interface DocumentInfo {
 
 export const DocumentMgmt: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [reprocessingId, setReprocessingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -63,6 +68,7 @@ export const DocumentMgmt: React.FC = () => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       await uploadFile(file);
+      e.target.value = ''; // allow re-selecting same file
     }
   };
 
@@ -89,12 +95,29 @@ export const DocumentMgmt: React.FC = () => {
   };
 
   const handleReprocess = async (id: number) => {
+    setReprocessingId(id);
     try {
       await api.post(`/documents/${id}/reprocess`);
-      // Update locally
+      // Backend: purge_document_vectors_task then process_document_task
       setDocuments(prev => prev.map(doc => doc.id === id ? { ...doc, status: 'pending' as const } : doc));
     } catch (e) {
       console.error('Error reprocessing document:', e);
+    } finally {
+      setReprocessingId(null);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    setConfirmDeleteId(null);
+    setDeletingId(id);
+    try {
+      await api.delete(`/documents/${id}`);
+      // Backend: soft-delete + Celery purges ChromaDB vectors async
+      setDocuments(prev => prev.filter(doc => doc.id !== id));
+    } catch (e) {
+      console.error('Error deleting document:', e);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -142,7 +165,7 @@ export const DocumentMgmt: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'flex-start' }}>
         {/* Upload Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div 
+          <div
             className="dropzone"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
@@ -154,13 +177,25 @@ export const DocumentMgmt: React.FC = () => {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>or click to browse from device</p>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Supported formats: PDF, DOCX, TXT, MD (Max 25MB)</p>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              onChange={handleFileSelect} 
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleFileSelect}
               accept=".pdf,.docx,.txt,.md"
             />
+          </div>
+
+          {/* Replace workflow tip */}
+          <div className="card" style={{ padding: '1rem', gap: '0.5rem' }}>
+            <strong style={{ fontSize: '0.9rem' }}>How to replace a document</strong>
+            <ol style={{ margin: '0.25rem 0 0 1.2rem', padding: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              <li>Click <strong>Delete</strong> on the old document — its ChromaDB vectors are purged automatically.</li>
+              <li>Upload the new version via drag-and-drop above.</li>
+            </ol>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              Or use <strong>Reprocess</strong> to re-embed the same file after content changes.
+            </p>
           </div>
 
           {isUploading && (
@@ -209,7 +244,7 @@ export const DocumentMgmt: React.FC = () => {
                     <th>Size</th>
                     <th>Status</th>
                     <th>Embeddings</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,18 +268,58 @@ export const DocumentMgmt: React.FC = () => {
                         )}
                       </td>
                       <td>
-                        {doc.status === 'failed' ? (
-                          <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-                            onClick={() => handleReprocess(doc.id)}
-                            title={doc.error_message || 'Unknown error'}
-                          >
-                            Reprocess
-                          </button>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
-                        )}
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {/* Reprocess — available for processed and failed */}
+                          {(doc.status === 'processed' || doc.status === 'failed') && (
+                            <button
+                              id={`reprocess-doc-${doc.id}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                              onClick={() => handleReprocess(doc.id)}
+                              disabled={reprocessingId === doc.id || deletingId === doc.id}
+                              title={doc.status === 'failed' ? (doc.error_message || 'Retry') : 'Re-embed this document'}
+                            >
+                              {reprocessingId === doc.id
+                                ? <Loader2 size={13} className="spin" />
+                                : <RotateCcw size={13} />}
+                              Reprocess
+                            </button>
+                          )}
+                          {/* Delete with inline confirm */}
+                          {confirmDeleteId === doc.id ? (
+                            <>
+                              <button
+                                id={`confirm-delete-doc-${doc.id}`}
+                                className="btn btn-danger"
+                                style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}
+                                onClick={() => handleDelete(doc.id)}
+                                disabled={deletingId === doc.id}
+                              >
+                                {deletingId === doc.id ? <Loader2 size={13} className="spin" /> : 'Confirm'}
+                              </button>
+                              <button
+                                id={`cancel-delete-doc-${doc.id}`}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem' }}
+                                onClick={() => setConfirmDeleteId(null)}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              id={`delete-doc-${doc.id}`}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.3rem 0.55rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                              onClick={() => setConfirmDeleteId(doc.id)}
+                              disabled={deletingId === doc.id || reprocessingId === doc.id}
+                              title="Delete document and purge its ChromaDB vectors"
+                            >
+                              {deletingId === doc.id ? <Loader2 size={13} className="spin" /> : <Trash2 size={13} />}
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -6,7 +6,7 @@ Route prefix: /api/v1/ai
 
 from datetime import datetime, timezone
 
-from flask import Blueprint
+from flask import Blueprint, Response, request, stream_with_context
 from flask_jwt_extended import jwt_required
 
 from app.dtos.ai_dto import (
@@ -68,6 +68,56 @@ def chat(data: dict):
         n_rag_results=data.get("n_rag_results", 4),
     )
     return success_response(result)
+
+
+@ai_bp.route("/chat/stream", methods=["POST"])
+@jwt_required()
+def chat_stream_sse():
+    """
+    POST /api/v1/ai/chat/stream
+    Stream an AI response via Server-Sent Events (SSE).
+
+    Production-grade streaming transport that works with:
+      - AWS ALB  (set idle timeout ≥ 300 s in target group settings)
+      - Nginx    (proxy_buffering off already configured)
+      - CloudFront (set min TTL=0, disable Gzip for text/event-stream)
+      - Any HTTP/1.1 or HTTP/2 proxy — no WebSocket required
+
+    Request body (JSON):
+      { "query": str, "session_uuid": str|null, "ticket_id": int|null }
+
+    Response: text/event-stream
+      data: {"type":"start",  "session_uuid":..., "session_title":...}
+      data: {"type":"chunk",  "content":"<token>"}
+      data: {"type":"done",   "session_uuid":..., "sources":[...], ...}
+      data: {"type":"error",  "message":"<error>"}
+    """
+    body    = request.get_json(silent=True) or {}
+    query   = (body.get("query") or "").strip()
+    if not query:
+        return {"error": {"message": "query is required"}}, 400
+
+    user_id      = get_current_user_id()
+    session_uuid = body.get("session_uuid")
+    ticket_id    = body.get("ticket_id")
+
+    generator = AIChatService.generate_chat_sse(
+        user_id=user_id,
+        query=query,
+        session_uuid=session_uuid,
+        ticket_id=ticket_id,
+    )
+
+    return Response(
+        stream_with_context(generator),
+        mimetype="text/event-stream",
+        headers={
+            # Prevent every proxy layer from buffering the stream
+            "Cache-Control":    "no-cache",
+            "X-Accel-Buffering": "no",       # Nginx: disable proxy_buffering
+            "Connection":       "keep-alive",
+        },
+    )
 
 
 @ai_bp.route("/sessions", methods=["GET"])

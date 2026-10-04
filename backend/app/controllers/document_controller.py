@@ -120,7 +120,7 @@ def reprocess_document(doc_id: int):
     if not doc.can_be_processed:
         raise ValidationError(
             f"Document in '{doc.status}' state cannot be reprocessed. "
-            "Only 'pending' or 'failed' documents can be requeued."
+            "Only 'pending', 'failed', or 'processed' documents can be requeued."
         )
 
     from app.tasks.document_tasks import process_document_task, purge_document_vectors_task
