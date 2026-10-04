@@ -96,6 +96,8 @@ def chat_stream_sse():
     query   = (body.get("query") or "").strip()
     if not query:
         return {"error": {"message": "query is required"}}, 400
+    if len(query) > 4000:
+        return {"error": {"message": "Query exceeds maximum allowed length of 4000 characters"}}, 400
 
     user_id      = get_current_user_id()
     session_uuid = body.get("session_uuid")

@@ -708,6 +708,10 @@ class AIChatService:
         except Exception as e:
             import traceback
             logger.error(f"generate_chat_sse failed for user={user_id}: {e}\n{traceback.format_exc()}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             import json
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n".encode()
 
