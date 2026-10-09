@@ -19,6 +19,10 @@ interface ChatMessage {
   sender_type: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  /** True when the SSE stream closed before the server sent a done event. */
+  isStreamInterrupted?: boolean;
+  /** True when one or more SSE frames failed JSON.parse during the stream. */
+  hadParseError?: boolean;
   rag_sources?: any[];
   latency_ms?: number;
   tokens_used?: number;
@@ -185,72 +189,120 @@ export const AIAssistant: React.FC = () => {
         const decoder = new TextDecoder();
         let   buffer  = "";
 
+        // ── Resilience flags ────────────────────────────────────────────────
+        // receivedDone: set only when the server emits {"type": "done"}.
+        // If the TCP socket closes before this flag is set, the stream was
+        // truncated (e.g. NGINX idle timeout, dropped Wi-Fi, backend crash).
+        // This distinguishes transport EOF from a clean application completion.
+        let receivedDone  = false;
+
+        // hadParseError: set if any SSE data line fails JSON.parse.
+        // We do NOT silently drop parse errors — we surface them to the user
+        // so a malformed chunk cannot masquerade as a complete response.
+        let hadParseError = false;
+        // ────────────────────────────────────────────────────────────────────
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
 
-          // SSE frames are separated by double newline
+          // SSE frames are separated by double newline.
           const parts = buffer.split("\n\n");
-          buffer = parts.pop() ?? "";  // keep incomplete frame
+          buffer = parts.pop() ?? ""; // Retain incomplete frame in buffer.
 
           for (const frame of parts) {
             for (const line of frame.split("\n")) {
+              // Skip SSE comment lines (e.g. proxy keep-alive ": ping").
               if (!line.startsWith("data: ")) continue;
+
+              let event: any;
               try {
-                const event = JSON.parse(line.slice(6));
-
-                if (event.type === "start") {
-                  // Capture session UUID from first event
-                  if (!activeSessionUuidRef.current && event.session_uuid) {
-                    setActiveSessionUuid(event.session_uuid);
-                    activeSessionUuidRef.current = event.session_uuid;
-                  }
-
-                } else if (event.type === "chunk") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId
-                        ? { ...m, content: m.content + event.content }
-                        : m
-                    )
-                  );
-
-                } else if (event.type === "done") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId
-                        ? {
-                            ...m,
-                            isStreaming:    false,
-                            rag_sources:    event.sources,
-                            latency_ms:     event.latency_ms,
-                            tokens_used:    event.tokens_used,
-                            ticket_created: event.ticket_created || null,
-                          }
-                        : m
-                    )
-                  );
-                  fetchSessions(false);
-
-                } else if (event.type === "error") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantMsgId
-                        ? { ...m, isStreaming: false, content: `⚠️ ${event.message}` }
-                        : m
-                    )
-                  );
-                }
+                event = JSON.parse(line.slice(6));
               } catch {
-                // Malformed SSE line — skip
+                // A data line that cannot be parsed is a genuine protocol
+                // error — not a keep-alive comment. Flag it so we can warn
+                // the user after the stream ends instead of silently dropping
+                // tokens that may have been meaningful.
+                hadParseError = true;
+                console.warn("[SSE] Unparseable data frame — possible network corruption:", line);
+                continue;
+              }
+
+              if (event.type === "start") {
+                // Capture session UUID returned by the server on the first event.
+                if (!activeSessionUuidRef.current && event.session_uuid) {
+                  setActiveSessionUuid(event.session_uuid);
+                  activeSessionUuidRef.current = event.session_uuid;
+                }
+
+              } else if (event.type === "chunk") {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, content: m.content + event.content }
+                      : m
+                  )
+                );
+
+              } else if (event.type === "done") {
+                // Server confirmed clean completion — mark flag before updating state.
+                receivedDone = true;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          isStreaming:    false,
+                          hadParseError:  hadParseError,
+                          rag_sources:    event.sources,
+                          latency_ms:     event.latency_ms,
+                          tokens_used:    event.tokens_used,
+                          ticket_created: event.ticket_created || null,
+                        }
+                      : m
+                  )
+                );
+                fetchSessions(false);
+
+              } else if (event.type === "error") {
+                // Server emitted an explicit application-level error event.
+                receivedDone = true; // Treat server error as intentional end.
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, isStreaming: false, content: `⚠️ ${event.message}` }
+                      : m
+                  )
+                );
               }
             }
           }
         }
+
+        // ── Post-stream truncation check ─────────────────────────────────────
+        // If the TCP socket closed (reader.read() done=true) without the server
+        // ever emitting {"type": "done"}, the response was interrupted.
+        // Common causes: NGINX idle timeout, dropped Wi-Fi, backend OOM crash.
+        // We mark the message as interrupted so the UI can warn the user.
+        if (!receivedDone) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    isStreaming:        false,
+                    isStreamInterrupted: true,
+                  }
+                : m
+            )
+          );
+        }
+        // ────────────────────────────────────────────────────────────────────
+
       } catch (err: any) {
-        if (err.name === "AbortError") return; // user navigated away
+        if (err.name === "AbortError") return; // User navigated away — clean exit.
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
@@ -434,6 +486,59 @@ export const AIAssistant: React.FC = () => {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* ── Stream interruption warning ──────────────────────────
+                      Shown when transport EOF arrived before the server sent
+                      {"type": "done"}. Indicates a network drop, NGINX idle
+                      timeout, or backend crash mid-generation. The user needs
+                      to know the response may be incomplete so they can retry.
+                  */}
+                  {!msg.isStreaming && msg.isStreamInterrupted && (
+                    <div style={{
+                      marginTop: "0.75rem",
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "6px",
+                      background: "rgba(234, 179, 8, 0.1)",
+                      border: "1px solid rgba(234, 179, 8, 0.35)",
+                      color: "var(--warning, #ca8a04)",
+                      fontSize: "0.78rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}>
+                      <span>⚠</span>
+                      <span>
+                        Response was interrupted before completion. This may be caused by a network
+                        disconnect or a server timeout. Please retry your message.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ── Parse error warning ───────────────────────────────────
+                      Shown when one or more SSE data frames failed JSON.parse
+                      during the stream. The response completed (done event was
+                      received) but some tokens may have been lost to corruption.
+                  */}
+                  {!msg.isStreaming && !msg.isStreamInterrupted && msg.hadParseError && (
+                    <div style={{
+                      marginTop: "0.75rem",
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "6px",
+                      background: "rgba(234, 179, 8, 0.08)",
+                      border: "1px solid rgba(234, 179, 8, 0.25)",
+                      color: "var(--warning, #ca8a04)",
+                      fontSize: "0.78rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}>
+                      <span>⚠</span>
+                      <span>
+                        Part of this response may be incomplete due to a network data error.
+                        If the answer looks truncated, please retry.
+                      </span>
                     </div>
                   )}
 
