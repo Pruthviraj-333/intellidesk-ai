@@ -67,6 +67,11 @@ class AIMessage(db.Model):
     latency_ms = db.Column(db.Integer, nullable=True)  # Response time tracking
     ticket_created = db.Column(db.JSON, nullable=True)  # Agentic ticket metadata if created
 
+    # Stream interruption flag — True when the client disconnected before the server
+    # sent the done event. The partial response is preserved so the user can see
+    # what was generated and retry. This is the production pattern used by ChatGPT/Claude.
+    is_truncated = db.Column(db.Boolean, default=False, nullable=False)
+
 
     created_at = db.Column(
         db.DateTime(timezone=True),

@@ -113,6 +113,9 @@ export const AIAssistant: React.FC = () => {
         latency_ms: m.latency_ms,
         tokens_used: m.tokens_used,
         ticket_created: m.ticket_created,
+        // Restore warning banner for messages that were interrupted mid-stream.
+        // is_truncated comes from the DB via the backend DTO.
+        isStreamInterrupted: m.is_truncated === true,
       }));
       setMessages(formatted);
     } catch (e) {

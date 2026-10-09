@@ -577,49 +577,10 @@ class AIChatService:
             messages.extend(history)
             messages.append({"role": "user", "content": query})
 
-            # ── 6. Emit start event ───────────────────────────────────────────
-            yield _sse({"type": "start", "session_uuid": session.session_uuid,
-                         "session_title": session.title})
-
-            # ── 7. Stream LLM tokens ──────────────────────────────────────────
-            response_chunks = []
-            model_used = None
-            prompt_tokens = 0
-            completion_tokens = 0
-            latency_ms = 0
-
-            for item in LLMService.chat_completion_stream(
-                messages=messages,
-                temperature=0.6,
-                max_tokens=1024,
-            ):
-                if "model" in item and not item.get("done"):
-                    model_used = item["model"]
-
-                elif "chunk" in item:
-                    chunk_text = item["chunk"]
-                    response_chunks.append(chunk_text)
-                    yield _sse({"type": "chunk", "content": chunk_text})
-
-                elif item.get("done"):
-                    model_used    = item.get("model", model_used)
-                    prompt_tokens = item.get("prompt_tokens", 0)
-                    completion_tokens = item.get("completion_tokens", len(response_chunks))
-                    latency_ms    = item.get("latency_ms", 0)
-
-            response_text = "".join(response_chunks)
-            total_tokens  = prompt_tokens + completion_tokens
-
-            # ── 8–9. Persist messages ─────────────────────────────────────────
-            user_msg = AIMessage(
-                session_id=session.id,
-                role="user",
-                content=query,
-                tokens_used=prompt_tokens,
-                model_used=model_used,
-            )
-            db.session.add(user_msg)
-
+            # ── 6. Persist user message and assistant placeholder BEFORE streaming ──
+            # Production pattern: save both turns immediately so the conversation is
+            # never lost if the client disconnects mid-stream. The assistant message
+            # is marked is_truncated=True until the done event confirms clean finish.
             rag_source_meta = [
                 {
                     "content_preview": r["content"][:150],
@@ -629,19 +590,92 @@ class AIChatService:
                 }
                 for r in rag_results
             ]
+            user_msg = AIMessage(
+                session_id=session.id,
+                role="user",
+                content=query,
+                tokens_used=0,
+                model_used=None,
+            )
+            db.session.add(user_msg)
             assistant_msg = AIMessage(
                 session_id=session.id,
                 role="assistant",
-                content=response_text,
-                tokens_used=completion_tokens,
+                content="",
+                tokens_used=0,
                 rag_sources=rag_source_meta,
-                model_used=model_used,
-                latency_ms=latency_ms,
+                model_used=None,
+                latency_ms=None,
+                is_truncated=True,   # assume interrupted; flipped to False on done
             )
             db.session.add(assistant_msg)
+            session.message_count += 2
+            db.session.commit()
 
-            # ── 10. Update session counters ───────────────────────────────────
-            session.message_count    += 2
+            # ── 7. Emit start event ───────────────────────────────────────────
+            yield _sse({"type": "start", "session_uuid": session.session_uuid,
+                         "session_title": session.title})
+
+            # ── 8. Stream LLM tokens ──────────────────────────────────────────
+            response_chunks = []
+            model_used = None
+            prompt_tokens = 0
+            completion_tokens = 0
+            latency_ms = 0
+
+            try:
+                for item in LLMService.chat_completion_stream(
+                    messages=messages,
+                    temperature=0.6,
+                    max_tokens=1024,
+                ):
+                    if "model" in item and not item.get("done"):
+                        model_used = item["model"]
+
+                    elif "chunk" in item:
+                        chunk_text = item["chunk"]
+                        response_chunks.append(chunk_text)
+                        yield _sse({"type": "chunk", "content": chunk_text})
+
+                    elif item.get("done"):
+                        model_used        = item.get("model", model_used)
+                        prompt_tokens     = item.get("prompt_tokens", 0)
+                        completion_tokens = item.get("completion_tokens", len(response_chunks))
+                        latency_ms        = item.get("latency_ms", 0)
+
+            except GeneratorExit:
+                # Client disconnected mid-stream (browser tab closed, network cut,
+                # NGINX timeout, etc.). Save whatever was generated so far.
+                partial_text = "".join(response_chunks)
+                logger.warning(
+                    f"SSE stream interrupted (GeneratorExit) for user={user_id} "
+                    f"session={session.session_uuid} — saving {len(partial_text)} chars as truncated"
+                )
+                try:
+                    assistant_msg.content    = partial_text if partial_text else "[Response interrupted before any content was generated.]"
+                    assistant_msg.model_used = model_used
+                    assistant_msg.is_truncated = True   # already True; be explicit
+                    user_msg.model_used = model_used
+                    db.session.commit()
+                except Exception as save_err:
+                    logger.error(f"Failed to save truncated message: {save_err}")
+                    db.session.rollback()
+                return  # generator must return (not raise) after GeneratorExit
+
+            response_text = "".join(response_chunks)
+            total_tokens  = prompt_tokens + completion_tokens
+
+            # ── 9. Update persisted messages with final content ───────────────
+            # is_truncated flips to False — clean completion confirmed.
+            assistant_msg.content      = response_text
+            assistant_msg.tokens_used  = completion_tokens
+            assistant_msg.model_used   = model_used
+            assistant_msg.latency_ms   = latency_ms
+            assistant_msg.is_truncated = False
+            user_msg.tokens_used       = prompt_tokens
+            user_msg.model_used        = model_used
+
+            # ── 10. Update session token counter ─────────────────────────────
             session.total_tokens_used += total_tokens
             db.session.commit()
 

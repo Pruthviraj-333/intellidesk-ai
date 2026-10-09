@@ -19,6 +19,9 @@ class ChatMessageSchema(Schema):
     model_used = fields.Str(dump_only=True, allow_none=True)
     latency_ms = fields.Int(dump_only=True, allow_none=True)
     ticket_created = fields.Dict(dump_only=True, allow_none=True)
+    # True when the stream was interrupted before the server sent a done event.
+    # Lets the frontend show a warning banner in history view.
+    is_truncated = fields.Bool(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
 
 
