@@ -381,13 +381,28 @@ export const AIAssistant: React.FC = () => {
           return;
         }
 
-        // ── Network drop mid-stream ───────────────────────────────────────────────
-        // If partial content was already generated before the error
-        // (e.g. WiFi dropped, backend restarted), treat it exactly like a
-        // transport interruption: show the warning banner + Retry button.
-        // Only fall back to the generic error string if nothing was generated.
+        // ── Network / server error ────────────────────────────────────────────
+        // Rate-limit (429): show a friendly inline message — no retry banner
+        //   because the user should wait, not immediately re-send.
+        // Everything else (network drop, backend crash, timeout): always show
+        //   the warning banner + Retry button, regardless of how many tokens
+        //   had already arrived. The user should be able to retry whether they
+        //   got partial content or nothing at all.
         const isRateLimit = err.message === "RATE_LIMIT";
-        if (!isRateLimit && hasPartialContent) {
+        if (isRateLimit) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    content: "⚠️ You've sent too many messages. Please wait a moment before trying again.",
+                  }
+                : m
+            )
+          );
+        } else {
+          // Network drop, backend crash, timeout — show the ⚠ banner + ↺ Retry.
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMsgId
@@ -395,21 +410,8 @@ export const AIAssistant: React.FC = () => {
                 : m
             )
           );
-        } else {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgId
-                ? {
-                    ...m,
-                    isStreaming: false,
-                    content: isRateLimit
-                      ? "⚠️ You've sent too many messages. Please wait a moment before trying again."
-                      : `⚠️ Connection error: ${err.message}`,
-                  }
-                : m
-            )
-          );
         }
+
       } finally {
         streamingIdRef.current = null;
         setIsStreaming(false);
