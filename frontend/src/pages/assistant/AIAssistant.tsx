@@ -23,6 +23,8 @@ interface ChatMessage {
   isStreamInterrupted?: boolean;
   /** True when one or more SSE frames failed JSON.parse during the stream. */
   hadParseError?: boolean;
+  /** The user query that produced this assistant message — used by the Retry button. */
+  originalQuery?: string;
   rag_sources?: any[];
   latency_ms?: number;
   tokens_used?: number;
@@ -140,6 +142,24 @@ export const AIAssistant: React.FC = () => {
     }
   };
 
+  // Retry a failed/interrupted response: remove the broken pair and re-stream.
+  const handleRetry = useCallback((assistantMsg: ChatMessage) => {
+    if (isStreaming || !assistantMsg.originalQuery) return;
+    // Remove the interrupted assistant message and its preceding user message from view.
+    // The DB records remain — a fresh pair will be appended by the stream.
+    setMessages((prev) => prev.filter(
+      (m) => m.id !== assistantMsg.id && m.content !== assistantMsg.originalQuery
+    ));
+    // Re-submit the original query directly.
+    setInputText(assistantMsg.originalQuery);
+    // Use a tiny timeout so the input state flushes before the submit fires.
+    setTimeout(() => {
+      document.getElementById("chat-input-form")?.dispatchEvent(
+        new Event("submit", { cancelable: true, bubbles: true })
+      );
+    }, 50);
+  }, [isStreaming]);
+
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -156,12 +176,12 @@ export const AIAssistant: React.FC = () => {
         { id: userMsgId, sender_type: "user", content: userMessageContent },
       ]);
 
-      // 2. Add empty assistant placeholder
+      // 2. Add empty assistant placeholder (store originalQuery so Retry button can use it)
       const assistantMsgId = userMsgId + 1;
       streamingIdRef.current = assistantMsgId;
       setMessages((prev) => [
         ...prev,
-        { id: assistantMsgId, sender_type: "assistant", content: "", isStreaming: true },
+        { id: assistantMsgId, sender_type: "assistant", content: "", isStreaming: true, originalQuery: userMessageContent },
       ]);
 
       // 3. Stream via SSE (plain HTTP POST — works through any proxy or load balancer)
@@ -501,21 +521,57 @@ export const AIAssistant: React.FC = () => {
                   {!msg.isStreaming && msg.isStreamInterrupted && (
                     <div style={{
                       marginTop: "0.75rem",
-                      padding: "0.5rem 0.75rem",
+                      padding: "0.6rem 0.75rem",
                       borderRadius: "6px",
-                      background: "rgba(234, 179, 8, 0.1)",
+                      background: "rgba(234, 179, 8, 0.08)",
                       border: "1px solid rgba(234, 179, 8, 0.35)",
                       color: "var(--warning, #ca8a04)",
                       fontSize: "0.78rem",
                       display: "flex",
                       alignItems: "center",
-                      gap: "0.4rem",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
                     }}>
-                      <span>⚠</span>
-                      <span>
-                        Response was interrupted before completion. This may be caused by a network
-                        disconnect or a server timeout. Please retry your message.
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span>⚠</span>
+                        <span>
+                          Response was interrupted before completion. This may be caused by a network
+                          disconnect or a server timeout.
+                        </span>
+                      </div>
+                      {msg.originalQuery && (
+                        <button
+                          id={`retry-btn-${msg.id}`}
+                          onClick={() => handleRetry(msg)}
+                          disabled={isStreaming}
+                          style={{
+                            flexShrink: 0,
+                            padding: "0.3rem 0.7rem",
+                            borderRadius: "5px",
+                            border: "1px solid rgba(234, 179, 8, 0.5)",
+                            background: "rgba(234, 179, 8, 0.15)",
+                            color: "var(--warning, #ca8a04)",
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            cursor: isStreaming ? "not-allowed" : "pointer",
+                            opacity: isStreaming ? 0.5 : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            transition: "background 0.15s",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isStreaming) (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.28)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.15)";
+                          }}
+                        >
+                          <span style={{ fontSize: "0.85rem" }}>↺</span>
+                          Retry
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -587,7 +643,7 @@ export const AIAssistant: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSendMessage} className="chat-input-area">
+        <form id="chat-input-form" onSubmit={handleSendMessage} className="chat-input-area">
           <input
             type="text"
             className="input-field"
