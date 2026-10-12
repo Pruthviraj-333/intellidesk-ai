@@ -5,7 +5,7 @@ import { FormattedMarkdown } from "../../components/common/FormattedMarkdown";
 import {
   Plus, Trash2, Send, MessageSquare, Compass, Info,
   BookOpen, User, Cpu, Brain, ThumbsUp, ThumbsDown,
-  Loader2, FileText, TicketCheck, ExternalLink,
+  Loader2, FileText, TicketCheck, ExternalLink, Square,
 } from "lucide-react";
 
 interface ChatSession {
@@ -45,10 +45,15 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export const AIAssistant: React.FC = () => {
   const { user } = useAuthStore();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const streamingIdRef = useRef<number | null>(null);
-  // AbortController lets us cancel an in-flight SSE stream (e.g. user navigates away)
-  const abortCtrlRef = useRef<AbortController | null>(null);
+  const messagesEndRef       = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const streamingIdRef       = useRef<number | null>(null);
+  // AbortController cancels an in-flight SSE stream.
+  const abortCtrlRef    = useRef<AbortController | null>(null);
+  // True when the user deliberately clicked Stop (vs. navigating away).
+  const userStoppedRef  = useRef(false);
+  // Smart-scroll: track whether the user is near the bottom.
+  const isAtBottomRef   = useRef(true);
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionUuid, setActiveSessionUuid] = useState<string | null>(null);
@@ -66,27 +71,33 @@ export const AIAssistant: React.FC = () => {
     activeSessionUuidRef.current = activeSessionUuid;
   }, [activeSessionUuid]);
 
-  // Cancel any in-flight stream when the component unmounts
+  // Cancel any in-flight stream when the component unmounts.
   useEffect(() => {
     return () => { abortCtrlRef.current?.abort(); };
   }, []);
 
-
-
-  const handleSelectSession = (uuid: string) => {
-    if (activeSessionUuid === uuid) return;
-    setActiveSessionUuid(uuid);
-    activeSessionUuidRef.current = uuid;
-    fetchMessages(uuid);
-  };
-
+  // ── Smart auto-scroll ───────────────────────────────────────────────────────
+  // Only scrolls to the bottom if the user is already near the bottom.
+  // This mirrors ChatGPT/Claude: if the user scrolled up to read earlier
+  // messages, streaming new tokens does NOT force them back down.
   useEffect(() => {
-    fetchSessions(true);
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isAtBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []);
+  // ───────────────────────────────────────────────────────────────────────────
+
 
   const fetchSessions = async (autoSelectFirst: boolean = false) => {
     try {
@@ -142,6 +153,17 @@ export const AIAssistant: React.FC = () => {
     }
   };
 
+  const handleSelectSession = (uuid: string) => {
+    if (activeSessionUuid === uuid) return;
+    // Snap to bottom when switching sessions.
+    isAtBottomRef.current = true;
+    setActiveSessionUuid(uuid);
+    activeSessionUuidRef.current = uuid;
+    fetchMessages(uuid);
+  };
+
+  useEffect(() => { fetchSessions(true); }, []);
+
   // Retry a failed/interrupted response: remove the broken pair and re-stream.
   const handleRetry = useCallback((assistantMsg: ChatMessage) => {
     if (isStreaming || !assistantMsg.originalQuery) return;
@@ -160,10 +182,21 @@ export const AIAssistant: React.FC = () => {
     }, 50);
   }, [isStreaming]);
 
+  // Stop generating: abort the current stream and keep whatever was generated.
+  const handleStop = () => {
+    userStoppedRef.current = true;
+    abortCtrlRef.current?.abort();
+  };
+
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!inputText.trim() || isStreaming) return;
+
+      // Reset stop flag for this new request.
+      userStoppedRef.current = false;
+      // When sending a new message, snap to bottom.
+      isAtBottomRef.current = true;
 
       const userMessageContent = inputText;
       setInputText("");
@@ -205,6 +238,8 @@ export const AIAssistant: React.FC = () => {
         });
 
         if (!response.ok || !response.body) {
+          // Surface rate-limit errors with a human-readable message.
+          if (response.status === 429) throw new Error("RATE_LIMIT");
           throw new Error(`Server error ${response.status}`);
         }
 
@@ -325,11 +360,32 @@ export const AIAssistant: React.FC = () => {
         // ────────────────────────────────────────────────────────────────────
 
       } catch (err: any) {
-        if (err.name === "AbortError") return; // User navigated away — clean exit.
+        if (err.name === "AbortError") {
+          if (userStoppedRef.current) {
+            // User deliberately clicked Stop — keep what was generated,
+            // mark the message as complete (not interrupted or failed).
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsgId
+                  ? { ...m, isStreaming: false }
+                  : m
+              )
+            );
+          }
+          // else: navigation away — silent clean exit, no state update needed.
+          return;
+        }
+        const isRateLimit = err.message === "RATE_LIMIT";
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
-              ? { ...m, isStreaming: false, content: `⚠️ Connection error: ${err.message}` }
+              ? {
+                  ...m,
+                  isStreaming: false,
+                  content: isRateLimit
+                    ? "⚠️ You've sent too many messages. Please wait a moment before trying again."
+                    : `⚠️ Connection error: ${err.message}`,
+                }
               : m
           )
         );
@@ -462,7 +518,7 @@ export const AIAssistant: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="chat-messages">
+          <div className="chat-messages" ref={messagesContainerRef}>
             {messages.map((msg) => (
               <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignSelf: msg.sender_type === "user" ? "flex-end" : "flex-start", width: "100%", alignItems: msg.sender_type === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
@@ -644,18 +700,57 @@ export const AIAssistant: React.FC = () => {
         )}
 
         <form id="chat-input-form" onSubmit={handleSendMessage} className="chat-input-area">
-          <input
-            type="text"
+          <textarea
+            id="chat-input"
             className="input-field"
             placeholder={isStreaming ? "IntelliBot is responding…" : "Type your question or query..."}
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={(e) => {
+              setInputText(e.target.value);
+              // Auto-grow: reset height then set to scrollHeight so it expands with content.
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!inputText.trim() || isStreaming) return;
+                document.getElementById("chat-input-form")?.dispatchEvent(
+                  new Event("submit", { cancelable: true, bubbles: true })
+                );
+              }
+            }}
             disabled={isStreaming}
-            required
+            rows={1}
+            style={{ resize: "none", overflow: "hidden", lineHeight: "1.5" }}
           />
-          <button type="submit" className="btn btn-primary" disabled={sendDisabled}>
-            <Send size={18} />
-          </button>
+          {isStreaming ? (
+            <button
+              id="stop-streaming-btn"
+              type="button"
+              onClick={handleStop}
+              className="btn btn-secondary"
+              title="Stop generating"
+              style={{
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                padding: "0.5rem 0.85rem",
+                border: "1px solid var(--border-color)",
+                borderRadius: "8px",
+                fontWeight: 600,
+                fontSize: "0.8rem",
+              }}
+            >
+              <Square size={14} fill="currentColor" />
+              Stop
+            </button>
+          ) : (
+            <button type="submit" className="btn btn-primary" disabled={sendDisabled}>
+              <Send size={18} />
+            </button>
+          )}
         </form>
       </div>
 
