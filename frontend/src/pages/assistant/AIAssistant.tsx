@@ -166,20 +166,32 @@ export const AIAssistant: React.FC = () => {
 
   // Retry a failed/interrupted response: remove the broken pair and re-stream.
   const handleRetry = useCallback((assistantMsg: ChatMessage) => {
-    if (isStreaming || !assistantMsg.originalQuery) return;
-    // Remove the interrupted assistant message and its preceding user message from view.
-    // The DB records remain — a fresh pair will be appended by the stream.
-    setMessages((prev) => prev.filter(
-      (m) => m.id !== assistantMsg.id && m.content !== assistantMsg.originalQuery
-    ));
-    // Re-submit the original query directly.
-    setInputText(assistantMsg.originalQuery);
-    // Use a tiny timeout so the input state flushes before the submit fires.
-    setTimeout(() => {
-      document.getElementById("chat-input-form")?.dispatchEvent(
-        new Event("submit", { cancelable: true, bubbles: true })
-      );
-    }, 50);
+    if (isStreaming) return;
+
+    if (assistantMsg.originalQuery) {
+      // In-session interruption: we have the original query stored in memory.
+      // Remove the interrupted pair from view and re-submit automatically.
+      setMessages((prev) => prev.filter(
+        (m) => m.id !== assistantMsg.id && m.content !== assistantMsg.originalQuery
+      ));
+      setInputText(assistantMsg.originalQuery);
+      setTimeout(() => {
+        document.getElementById("chat-input-form")?.dispatchEvent(
+          new Event("submit", { cancelable: true, bubbles: true })
+        );
+      }, 50);
+    } else {
+      // History view: originalQuery not stored in DB.
+      // Focus the input and pre-fill the placeholder so the user can retype.
+      const input = document.getElementById("chat-input") as HTMLTextAreaElement | null;
+      if (input) {
+        input.focus();
+        input.placeholder = "Please retype your question to retry...";
+        setTimeout(() => {
+          input.placeholder = "Type your question or query...";
+        }, 4000);
+      }
+    }
   }, [isStreaming]);
 
   // Stop generating: abort the current stream and keep whatever was generated.
@@ -618,39 +630,37 @@ export const AIAssistant: React.FC = () => {
                           disconnect or a server timeout.
                         </span>
                       </div>
-                      {msg.originalQuery && (
-                        <button
-                          id={`retry-btn-${msg.id}`}
-                          onClick={() => handleRetry(msg)}
-                          disabled={isStreaming}
-                          style={{
-                            flexShrink: 0,
-                            padding: "0.3rem 0.7rem",
-                            borderRadius: "5px",
-                            border: "1px solid rgba(234, 179, 8, 0.5)",
-                            background: "rgba(234, 179, 8, 0.15)",
-                            color: "var(--warning, #ca8a04)",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            cursor: isStreaming ? "not-allowed" : "pointer",
-                            opacity: isStreaming ? 0.5 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.3rem",
-                            transition: "background 0.15s",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isStreaming) (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.28)";
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.15)";
-                          }}
-                        >
-                          <span style={{ fontSize: "0.85rem" }}>↺</span>
-                          Retry
-                        </button>
-                      )}
+                      <button
+                        id={`retry-btn-${msg.id}`}
+                        onClick={() => handleRetry(msg)}
+                        disabled={isStreaming}
+                        style={{
+                          flexShrink: 0,
+                          padding: "0.3rem 0.7rem",
+                          borderRadius: "5px",
+                          border: "1px solid rgba(234, 179, 8, 0.5)",
+                          background: "rgba(234, 179, 8, 0.15)",
+                          color: "var(--warning, #ca8a04)",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          cursor: isStreaming ? "not-allowed" : "pointer",
+                          opacity: isStreaming ? 0.5 : 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                          transition: "background 0.15s",
+                          whiteSpace: "nowrap",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isStreaming) (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.28)";
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLButtonElement).style.background = "rgba(234, 179, 8, 0.15)";
+                        }}
+                      >
+                        <span style={{ fontSize: "0.85rem" }}>↺</span>
+                        {msg.originalQuery ? "Retry" : "Re-ask"}
+                      </button>
                     </div>
                   )}
 
