@@ -45,15 +45,15 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export const AIAssistant: React.FC = () => {
   const { user } = useAuthStore();
-  const messagesEndRef       = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const streamingIdRef       = useRef<number | null>(null);
+  const streamingIdRef = useRef<number | null>(null);
   // AbortController cancels an in-flight SSE stream.
-  const abortCtrlRef    = useRef<AbortController | null>(null);
+  const abortCtrlRef = useRef<AbortController | null>(null);
   // True when the user deliberately clicked Stop (vs. navigating away).
-  const userStoppedRef  = useRef(false);
+  const userStoppedRef = useRef(false);
   // Smart-scroll: track whether the user is near the bottom.
-  const isAtBottomRef   = useRef(true);
+  const isAtBottomRef = useRef(true);
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionUuid, setActiveSessionUuid] = useState<string | null>(null);
@@ -176,20 +176,27 @@ export const AIAssistant: React.FC = () => {
     if (isStreaming) return;
 
     if (assistantMsg.originalQuery) {
-      // In-session interruption: we have the original query stored in memory.
-      // Remove the interrupted pair from view and re-submit automatically.
-      setMessages((prev) => prev.filter(
-        (m) => m.id !== assistantMsg.id && m.content !== assistantMsg.originalQuery
-      ));
-      setInputText(assistantMsg.originalQuery);
+      const queryToRetry = assistantMsg.originalQuery;
+      // Remove this specific interrupted assistant message and the user message
+      // directly before it — matched by index, not by content, so duplicate
+      // questions earlier in the session are never accidentally deleted.
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === assistantMsg.id);
+        if (idx > 0 && prev[idx - 1].sender_type === "user") {
+          return prev.filter((_, i) => i !== idx && i !== idx - 1);
+        }
+        return prev.filter((m) => m.id !== assistantMsg.id);
+      });
+      // Re-submit directly — no fragile setTimeout or synthetic DOM events.
+      setInputText(queryToRetry);
       setTimeout(() => {
         document.getElementById("chat-input-form")?.dispatchEvent(
           new Event("submit", { cancelable: true, bubbles: true })
         );
-      }, 50);
+      }, 0);
     } else {
       // History view: originalQuery not stored in DB.
-      // Focus the input and pre-fill the placeholder so the user can retype.
+      // Focus the input and let the user retype.
       const input = document.getElementById("chat-input") as HTMLTextAreaElement | null;
       if (input) {
         input.focus();
@@ -247,22 +254,22 @@ export const AIAssistant: React.FC = () => {
       // hasPartialContent: true once the first token chunk arrives.
       //   Used by the catch block to show the retry banner instead of a
       //   generic error when a network drop happens mid-stream.
-      let receivedDone      = false;
+      let receivedDone = false;
       let hasPartialContent = false;
       // ────────────────────────────────────────────────────────────────────
 
       try {
         const token = localStorage.getItem("access_token");
         const response = await fetch(`${API_BASE}/ai/chat/stream`, {
-          method:  "POST",
+          method: "POST",
           headers: {
-            "Content-Type":  "application/json",
+            "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body:   JSON.stringify({
-            query:        userMessageContent,
+          body: JSON.stringify({
+            query: userMessageContent,
             session_uuid: activeSessionUuidRef.current || null,
-            ticket_id:    null,
+            ticket_id: null,
           }),
           signal: abortCtrl.signal,
         });
@@ -273,9 +280,9 @@ export const AIAssistant: React.FC = () => {
           throw new Error(`Server error ${response.status}`);
         }
 
-        const reader  = response.body.getReader();
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let   buffer  = "";
+        let buffer = "";
 
         // hadParseError: set if any SSE data line fails JSON.parse.
         // We do NOT silently drop parse errors — we surface them to the user
@@ -335,14 +342,14 @@ export const AIAssistant: React.FC = () => {
                   prev.map((m) =>
                     m.id === assistantMsgId
                       ? {
-                          ...m,
-                          isStreaming:    false,
-                          hadParseError:  hadParseError,
-                          rag_sources:    event.sources,
-                          latency_ms:     event.latency_ms,
-                          tokens_used:    event.tokens_used,
-                          ticket_created: event.ticket_created || null,
-                        }
+                        ...m,
+                        isStreaming: false,
+                        hadParseError: hadParseError,
+                        rag_sources: event.sources,
+                        latency_ms: event.latency_ms,
+                        tokens_used: event.tokens_used,
+                        ticket_created: event.ticket_created || null,
+                      }
                       : m
                   )
                 );
@@ -363,6 +370,58 @@ export const AIAssistant: React.FC = () => {
           }
         }
 
+        // ── EOF: flush the TextDecoder and process any trailing buffer ────────
+        // decoder.decode() with no arguments flushes any buffered multi-byte
+        // UTF-8 sequence that was split across the final TCP packet. Without
+        // this, a 4-byte emoji or CJK character arriving last can be silently
+        // dropped or corrupted.
+        buffer += decoder.decode();
+
+        // A well-formed SSE stream always terminates frames with \n\n, but
+        // abrupt closes or proxy truncation can leave a partial frame in the
+        // buffer without a trailing double-newline. Parse it explicitly so
+        // a done event arriving in the last packet is not missed.
+        if (buffer.trim()) {
+          for (const line of buffer.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === "chunk") {
+                hasPartialContent = true;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, content: m.content + event.content }
+                      : m
+                  )
+                );
+              } else if (event.type === "done") {
+                receivedDone = true;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          isStreaming:    false,
+                          hadParseError:  hadParseError,
+                          rag_sources:    event.sources,
+                          latency_ms:     event.latency_ms,
+                          tokens_used:    event.tokens_used,
+                          ticket_created: event.ticket_created || null,
+                        }
+                      : m
+                  )
+                );
+                fetchSessions(false);
+              }
+            } catch {
+              // Trailing frame was also malformed — count it as a parse error.
+              hadParseError = true;
+            }
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // ── Post-stream truncation check ─────────────────────────────────────
         // If the TCP socket closed (reader.read() done=true) without the server
         // ever emitting {"type": "done"}, the response was interrupted.
@@ -373,10 +432,10 @@ export const AIAssistant: React.FC = () => {
             prev.map((m) =>
               m.id === assistantMsgId
                 ? {
-                    ...m,
-                    isStreaming:        false,
-                    isStreamInterrupted: true,
-                  }
+                  ...m,
+                  isStreaming: false,
+                  isStreamInterrupted: true,
+                }
                 : m
             )
           );
@@ -413,10 +472,10 @@ export const AIAssistant: React.FC = () => {
             prev.map((m) =>
               m.id === assistantMsgId
                 ? {
-                    ...m,
-                    isStreaming: false,
-                    content: "⚠️ You've sent too many messages. Please wait a moment before trying again.",
-                  }
+                  ...m,
+                  isStreaming: false,
+                  content: "⚠️ You've sent too many messages. Please wait a moment before trying again.",
+                }
                 : m
             )
           );
