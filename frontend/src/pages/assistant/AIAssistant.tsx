@@ -118,7 +118,8 @@ export const AIAssistant: React.FC = () => {
   const fetchMessages = async (sessionUuid: string) => {
     try {
       const response = await api.get(`/ai/sessions/${sessionUuid}`);
-      const formatted = (response.data.data || []).map((m: any) => ({
+      const raw = response.data.data || [];
+      const formatted = raw.map((m: any, idx: number, arr: any[]) => ({
         id: m.id,
         sender_type: m.role,
         content: m.content,
@@ -126,11 +127,17 @@ export const AIAssistant: React.FC = () => {
         latency_ms: m.latency_ms,
         tokens_used: m.tokens_used,
         ticket_created: m.ticket_created,
-        // Restore warning banner for messages that were interrupted mid-stream.
+        // Restore warning banner for messages interrupted mid-stream.
         // is_truncated comes from the DB via the backend DTO.
         isStreamInterrupted: m.is_truncated === true,
+        // Restore originalQuery from the preceding user message so the
+        // Retry button can auto-resubmit without the user having to retype.
+        originalQuery: m.is_truncated === true && idx > 0 && arr[idx - 1].role === "user"
+          ? arr[idx - 1].content
+          : undefined,
       }));
       setMessages(formatted);
+
     } catch (e) {
       console.error(e);
     }
