@@ -221,6 +221,17 @@ export const AIAssistant: React.FC = () => {
       const abortCtrl = new AbortController();
       abortCtrlRef.current = abortCtrl;
 
+      // ── Resilience flags ─────────────────────────────────────────────────
+      // Declared OUTSIDE the try block so the catch block can read them.
+      //
+      // receivedDone: true only when server emits {"type": "done"}.
+      // hasPartialContent: true once the first token chunk arrives.
+      //   Used by the catch block to show the retry banner instead of a
+      //   generic error when a network drop happens mid-stream.
+      let receivedDone      = false;
+      let hasPartialContent = false;
+      // ────────────────────────────────────────────────────────────────────
+
       try {
         const token = localStorage.getItem("access_token");
         const response = await fetch(`${API_BASE}/ai/chat/stream`, {
@@ -246,13 +257,6 @@ export const AIAssistant: React.FC = () => {
         const reader  = response.body.getReader();
         const decoder = new TextDecoder();
         let   buffer  = "";
-
-        // ── Resilience flags ────────────────────────────────────────────────
-        // receivedDone: set only when the server emits {"type": "done"}.
-        // If the TCP socket closes before this flag is set, the stream was
-        // truncated (e.g. NGINX idle timeout, dropped Wi-Fi, backend crash).
-        // This distinguishes transport EOF from a clean application completion.
-        let receivedDone  = false;
 
         // hadParseError: set if any SSE data line fails JSON.parse.
         // We do NOT silently drop parse errors — we surface them to the user
@@ -296,6 +300,7 @@ export const AIAssistant: React.FC = () => {
                 }
 
               } else if (event.type === "chunk") {
+                hasPartialContent = true; // Mark that content arrived before any error.
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsgId
@@ -375,20 +380,36 @@ export const AIAssistant: React.FC = () => {
           // else: navigation away — silent clean exit, no state update needed.
           return;
         }
+
+        // ── Network drop mid-stream ───────────────────────────────────────────────
+        // If partial content was already generated before the error
+        // (e.g. WiFi dropped, backend restarted), treat it exactly like a
+        // transport interruption: show the warning banner + Retry button.
+        // Only fall back to the generic error string if nothing was generated.
         const isRateLimit = err.message === "RATE_LIMIT";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsgId
-              ? {
-                  ...m,
-                  isStreaming: false,
-                  content: isRateLimit
-                    ? "⚠️ You've sent too many messages. Please wait a moment before trying again."
-                    : `⚠️ Connection error: ${err.message}`,
-                }
-              : m
-          )
-        );
+        if (!isRateLimit && hasPartialContent) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, isStreaming: false, isStreamInterrupted: true }
+                : m
+            )
+          );
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    isStreaming: false,
+                    content: isRateLimit
+                      ? "⚠️ You've sent too many messages. Please wait a moment before trying again."
+                      : `⚠️ Connection error: ${err.message}`,
+                  }
+                : m
+            )
+          );
+        }
       } finally {
         streamingIdRef.current = null;
         setIsStreaming(false);
